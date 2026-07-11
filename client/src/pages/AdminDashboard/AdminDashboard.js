@@ -13,6 +13,7 @@ export default function AdminDashboard() {
   const [templates, setTemplates] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [customDesigns, setCustomDesigns] = useState([]);
+  const [services, setServices] = useState([]);
 
   // Seeding/Loading states
   const [loading, setLoading] = useState(false);
@@ -59,6 +60,13 @@ export default function AdminDashboard() {
     ]
   }, null, 2));
 
+  // Services form
+  const [srvId, setSrvId] = useState(null);
+  const [srvTitle, setSrvTitle] = useState('');
+  const [srvDesc, setSrvDesc] = useState('');
+  const [srvPrice, setSrvPrice] = useState('');
+  const [srvFile, setSrvFile] = useState(null);
+
   // Load Admin Data
   useEffect(() => {
     fetchAdminData();
@@ -92,6 +100,9 @@ export default function AdminDashboard() {
         if (contactsData.success) setContacts(contactsData.data);
         const { data: designsData } = await API.get('/contact/custom-designs');
         if (designsData.success) setCustomDesigns(designsData.data);
+      } else if (activeTab === 'services') {
+        const { data } = await API.get('/services');
+        if (data.success) setServices(data.data);
       }
     } catch (err) {
       console.error('Error fetching admin dashboard details:', err);
@@ -344,6 +355,81 @@ export default function AdminDashboard() {
     }
   };
 
+  // Submit Service Form (Create or Edit)
+  const handleServiceSubmit = async (e) => {
+    e.preventDefault();
+    if (!srvTitle || !srvDesc) {
+      showStatus('Please enter a title and description.', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      const formData = new FormData();
+      formData.append('title', srvTitle);
+      formData.append('description', srvDesc);
+      formData.append('price', srvPrice || 'Contact for pricing');
+      if (srvFile) formData.append('image', srvFile);
+
+      if (srvId) {
+        // Edit Mode
+        const { data } = await API.put(`/services/${srvId}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        if (data.success) {
+          showStatus('Service updated successfully.');
+          resetServiceForm();
+          fetchAdminData();
+        }
+      } else {
+        // Create Mode
+        const { data } = await API.post('/services', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        if (data.success) {
+          showStatus('Service added successfully.');
+          resetServiceForm();
+          fetchAdminData();
+        }
+      }
+    } catch (err) {
+      console.error('Save service error:', err);
+      showStatus(err.response?.data?.message || 'Failed to save service.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEditService = (srv) => {
+    setSrvId(srv._id);
+    setSrvTitle(srv.title);
+    setSrvDesc(srv.description);
+    setSrvPrice(srv.price || 'Contact for pricing');
+    setSrvFile(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const resetServiceForm = () => {
+    setSrvId(null);
+    setSrvTitle('');
+    setSrvDesc('');
+    setSrvPrice('');
+    setSrvFile(null);
+  };
+
+  const handleDeleteService = async (serviceId) => {
+    if (!window.confirm('Are you sure you want to delete this service card?')) return;
+    try {
+      const { data } = await API.delete(`/services/${serviceId}`);
+      if (data.success) {
+        showStatus('Service removed successfully.');
+        fetchAdminData();
+      }
+    } catch (err) {
+      console.error('Delete service error:', err);
+      showStatus(err.response?.data?.message || 'Failed to delete service.', 'error');
+    }
+  };
+
   const selectedCatObj = categories.find((c) => c._id === tplCategory);
   const isPoliticalCategory = selectedCatObj && (selectedCatObj.slug === 'political' || selectedCatObj.name === 'Political');
 
@@ -370,6 +456,7 @@ export default function AdminDashboard() {
         <button className={`admin-tab-btn ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>🛒 Orders</button>
         <button className={`admin-tab-btn ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>👥 Users</button>
         <button className={`admin-tab-btn ${activeTab === 'inquiries' ? 'active' : ''}`} onClick={() => setActiveTab('inquiries')}>✉️ Inquiries</button>
+        <button className={`admin-tab-btn ${activeTab === 'services' ? 'active' : ''}`} onClick={() => setActiveTab('services')}>🛠️ Services</button>
       </div>
 
       {loading ? (
@@ -771,6 +858,77 @@ export default function AdminDashboard() {
                 </table>
               </div>
 
+            </div>
+          )}
+
+          {/* Tab 7: Services CRUD */}
+          {activeTab === 'services' && (
+            <div className="admin-services-panel fade-in-up">
+              <div className="admin-split-grid">
+
+                {/* Form Service */}
+                <form onSubmit={handleServiceSubmit} className="admin-form glass-card">
+                  <h2>{srvId ? 'Edit Service Card' : 'Add New Service Card'}</h2>
+                  <div className="form-group">
+                    <label className="form-label">Service Title</label>
+                    <input type="text" required className="form-input" value={srvTitle} onChange={(e) => setSrvTitle(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Description</label>
+                    <textarea required className="form-input" rows="4" value={srvDesc} onChange={(e) => setSrvDesc(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Pricing / Price (e.g., "₹2,500/month" or "Contact for pricing")</label>
+                    <input type="text" required className="form-input" value={srvPrice} onChange={(e) => setSrvPrice(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Service Image / Icon {srvId ? '(Optional Update)' : '(Optional)'}</label>
+                    <input type="file" className="form-input" accept="image/*" onChange={(e) => setSrvFile(e.target.files[0])} />
+                  </div>
+                  
+                  <div className="form-actions-row">
+                    <button type="submit" disabled={saving} className="btn btn-primary flex-grow">
+                      {saving ? 'Saving...' : 'Save Service'}
+                    </button>
+                    {srvId && (
+                      <button type="button" onClick={resetServiceForm} className="btn btn-secondary">
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </form>
+
+                {/* Services Table */}
+                <div className="admin-table-wrapper glass-card">
+                  <h2>Services List ({services.length})</h2>
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Title</th>
+                        <th>Price</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {services.map((srv) => (
+                        <tr key={srv._id}>
+                          <td><strong>{srv.title}</strong></td>
+                          <td><strong>{srv.price}</strong></td>
+                          <td className="table-desc-cell">{srv.description}</td>
+                          <td>
+                            <div className="table-actions-row">
+                              <button onClick={() => handleEditService(srv)} className="btn btn-secondary btn-xs">Edit</button>
+                              <button onClick={() => handleDeleteService(srv._id)} className="btn btn-danger btn-xs">Delete</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+              </div>
             </div>
           )}
 
