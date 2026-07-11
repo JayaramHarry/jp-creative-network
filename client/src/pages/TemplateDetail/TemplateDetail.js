@@ -104,6 +104,7 @@ export default function TemplateDetail() {
   const layersRef = useRef(layers);
   const drawCanvasRef = useRef(null);
   const activePointersRef = useRef(new Map());
+  const lastActionTimeRef = useRef(0);
 
   useEffect(() => {
     currentTimeRef.current = currentTime;
@@ -995,6 +996,12 @@ export default function TemplateDetail() {
   const handleLayerPointerDown = (e, layer) => {
     // Only handle touch pointers — mouse uses existing handlers
     if (e.pointerType !== 'touch') return;
+    
+    // Safety guard: Do not intercept taps on toolbar/action buttons, inputs, tabs, header or menu lists
+    if (e.target.closest('button, input, select, textarea, a, [role="button"], .layer-actions, .editor-tab-panel, .editor-left-tabs, .editor-header, .context-menu')) {
+      return;
+    }
+
     if (layer.locked) return;
     if (!isAdmin() && layer.userEditable === false) return;
 
@@ -1037,6 +1044,12 @@ export default function TemplateDetail() {
 
   const handleLayerPointerMove = (e) => {
     if (e.pointerType !== 'touch') return;
+    
+    // Safety guard: Do not intercept pointer events on UI buttons and controls
+    if (e.target.closest('button, input, select, textarea, a, [role="button"], .layer-actions, .editor-tab-panel, .editor-left-tabs, .editor-header, .context-menu')) {
+      return;
+    }
+    
     e.preventDefault();
 
     const pointers = activePointersRef.current;
@@ -1064,8 +1077,19 @@ export default function TemplateDetail() {
 
   const handleLayerPointerUp = (e) => {
     if (e.pointerType !== 'touch') return;
+    
+    // Safety guard: Do not intercept pointer events on UI buttons and controls
+    if (e.target.closest('button, input, select, textarea, a, [role="button"], .layer-actions, .editor-tab-panel, .editor-left-tabs, .editor-header, .context-menu')) {
+      return;
+    }
+
     const pointers = activePointersRef.current;
     pointers.delete(e.pointerId);
+
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current);
+      touchTimerRef.current = null;
+    }
 
     if (pointers.size === 0) {
       gestureBaseRef.current = null;
@@ -1091,6 +1115,12 @@ export default function TemplateDetail() {
   const handleResizePointerDown = (e, layer) => {
     if (e.pointerType !== 'touch') return;
     if (layer.locked) return;
+    
+    // Safety guard: Do not intercept pointer events on UI buttons and controls
+    if (e.target.closest('button, input, select, textarea, a, [role="button"], .layer-actions, .editor-tab-panel, .editor-left-tabs, .editor-header, .context-menu')) {
+      return;
+    }
+
     e.preventDefault();
     e.stopPropagation();
 
@@ -1111,10 +1141,26 @@ export default function TemplateDetail() {
       });
     };
 
-    const onUp = () => {
+    const onUp = (upEvent) => {
+      // Release pointer capture correctly
+      try {
+        upEvent.target.releasePointerCapture(upEvent.pointerId);
+      } catch (_) {}
+
       e.target.removeEventListener('pointermove', onMove);
       e.target.removeEventListener('pointerup', onUp);
       e.target.removeEventListener('pointercancel', onUp);
+
+      // Clean up active pointer records and reset gesture base state
+      activePointersRef.current.delete(upEvent.pointerId);
+      activePointersRef.current.clear(); // Safe fallback reset
+      gestureBaseRef.current = null;
+
+      if (touchTimerRef.current) {
+        clearTimeout(touchTimerRef.current);
+        touchTimerRef.current = null;
+      }
+
       saveStateToHistory();
     };
 
@@ -1127,6 +1173,12 @@ export default function TemplateDetail() {
   const handleRotatePointerDown = (e, layer) => {
     if (e.pointerType !== 'touch') return;
     if (layer.locked) return;
+    
+    // Safety guard: Do not intercept pointer events on UI buttons and controls
+    if (e.target.closest('button, input, select, textarea, a, [role="button"], .layer-actions, .editor-tab-panel, .editor-left-tabs, .editor-header, .context-menu')) {
+      return;
+    }
+
     e.preventDefault();
     e.stopPropagation();
 
@@ -1145,10 +1197,26 @@ export default function TemplateDetail() {
       updateLayerProperties(layer.id, { rotation: Math.round(deg) });
     };
 
-    const onUp = () => {
+    const onUp = (upEvent) => {
+      // Release pointer capture correctly
+      try {
+        upEvent.target.releasePointerCapture(upEvent.pointerId);
+      } catch (_) {}
+
       e.target.removeEventListener('pointermove', onMove);
       e.target.removeEventListener('pointerup', onUp);
       e.target.removeEventListener('pointercancel', onUp);
+
+      // Clean up active pointer records and reset gesture base state
+      activePointersRef.current.delete(upEvent.pointerId);
+      activePointersRef.current.clear(); // Safe fallback reset
+      gestureBaseRef.current = null;
+
+      if (touchTimerRef.current) {
+        clearTimeout(touchTimerRef.current);
+        touchTimerRef.current = null;
+      }
+
       saveStateToHistory();
     };
 
@@ -2389,6 +2457,17 @@ export default function TemplateDetail() {
     link.click();
   };
 
+  const handleLayerActionButtonClick = (e, callback) => {
+    e.stopPropagation();
+    const now = Date.now();
+    // Prevent double execution within 300ms (e.g. pointerup + click)
+    if (now - lastActionTimeRef.current < 300) {
+      return;
+    }
+    lastActionTimeRef.current = now;
+    callback();
+  };
+
   // DRY style properties rendering for desktop vs mobile drawer
   const renderPropertiesContent = () => {
     if (!activeLayer) {
@@ -3168,17 +3247,38 @@ export default function TemplateDetail() {
                       </span>
                       <span className="layer-name">{layer.name}</span>
                       <div className="layer-actions">
-                        <button onClick={(e) => { e.stopPropagation(); updateLayerProperties(layer.id, { hidden: !layer.hidden }); }}>
+                        <button 
+                          onPointerUp={(e) => handleLayerActionButtonClick(e, () => updateLayerProperties(layer.id, { hidden: !layer.hidden }))}
+                          onClick={(e) => handleLayerActionButtonClick(e, () => updateLayerProperties(layer.id, { hidden: !layer.hidden }))}
+                        >
                           {layer.hidden ? '👁️‍🗨️' : '👁️'}
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); updateLayerProperties(layer.id, { locked: !layer.locked }); }}>
+                        <button 
+                          onPointerUp={(e) => handleLayerActionButtonClick(e, () => updateLayerProperties(layer.id, { locked: !layer.locked }))}
+                          onClick={(e) => handleLayerActionButtonClick(e, () => updateLayerProperties(layer.id, { locked: !layer.locked }))}
+                        >
                           {layer.locked ? '🔒' : '🔓'}
                         </button>
                         {layer.type !== 'background' && (
                           <>
-                            <button onClick={(e) => { e.stopPropagation(); adjustLayerOrder(layer.id, 'forward'); }}>▲</button>
-                            <button onClick={(e) => { e.stopPropagation(); adjustLayerOrder(layer.id, 'backward'); }}>▼</button>
-                            <button onClick={(e) => { e.stopPropagation(); deleteLayer(layer.id); }}>🗑️</button>
+                            <button 
+                              onPointerUp={(e) => handleLayerActionButtonClick(e, () => adjustLayerOrder(layer.id, 'forward'))}
+                              onClick={(e) => handleLayerActionButtonClick(e, () => adjustLayerOrder(layer.id, 'forward'))}
+                            >
+                              ▲
+                            </button>
+                            <button 
+                              onPointerUp={(e) => handleLayerActionButtonClick(e, () => adjustLayerOrder(layer.id, 'backward'))}
+                              onClick={(e) => handleLayerActionButtonClick(e, () => adjustLayerOrder(layer.id, 'backward'))}
+                            >
+                              ▼
+                            </button>
+                            <button 
+                              onPointerUp={(e) => handleLayerActionButtonClick(e, () => deleteLayer(layer.id))}
+                              onClick={(e) => handleLayerActionButtonClick(e, () => deleteLayer(layer.id))}
+                            >
+                              🗑️
+                            </button>
                           </>
                         )}
                       </div>
