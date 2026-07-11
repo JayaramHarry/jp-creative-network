@@ -1,0 +1,25 @@
+# Dependency directories
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environments & Secrets
+.env
+server/.env
+client/.env
+
+# Build outputs
+client/dist/
+client/build/
+
+# OS/Editor caches
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+
+# Large media recordings (not needed in repo)
+*.mp4
+*.avi
+*.mkv
