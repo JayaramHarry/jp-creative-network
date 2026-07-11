@@ -1,0 +1,201 @@
+.floating-container {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.floating-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.floating-container.expanded .floating-menu {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.floating-action {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  transition: var(--transition-smooth);
+  text-decoration: none;
+}
+
+.floating-action .icon {
+  font-size: 1.25rem;
+}
+
+.floating-action .tooltip {
+  position: absolute;
+  right: 65px;
+  background: rgba(10, 12, 16, 0.9);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(10px);
+  transition: var(--transition-smooth);
+  border: 1px solid var(--border-color);
+}
+
+.floating-action:hover .tooltip {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.floating-action .mobile-label {
+  display: none;
+}
+
+/* WhatsApp Styling */
+.floating-action.whatsapp {
+  background: rgba(37, 211, 102, 0.15);
+  border-color: rgba(37, 211, 102, 0.3);
+  color: #25D366;
+}
+
+.floating-action.whatsapp:hover {
+  background: #25D366;
+  color: #fff;
+  box-shadow: 0 0 20px rgba(37, 211, 102, 0.5);
+  transform: scale(1.1);
+}
+
+/* Instagram Base Styling */
+.floating-action.instagram {
+  background: rgba(225, 48, 108, 0.15);
+  border-color: rgba(225, 48, 108, 0.3);
+  color: #E1306C;
+}
+
+/* Different Instagram Colors to differentiate */
+.floating-action.poster-ig:hover {
+  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(225, 48, 108, 0.5);
+  transform: scale(1.1);
+}
+
+.floating-action.ai-ig:hover {
+  background: linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(131, 58, 180, 0.5);
+  transform: scale(1.1);
+}
+
+.floating-action.reels-ig:hover {
+  background: linear-gradient(45deg, #405de6 0%, #5851db 25%, #833ab4 50%, #c13584 75%, #e1306c 100%);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(88, 81, 219, 0.5);
+  transform: scale(1.1);
+}
+
+/* YouTube Styling */
+.floating-action.youtube {
+  background: rgba(255, 0, 0, 0.15);
+  border-color: rgba(255, 0, 0, 0.3);
+  color: #FF0000;
+}
+
+.floating-action.youtube:hover {
+  background: #FF0000;
+  color: #fff;
+  box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+  transform: scale(1.1);
+}
+
+/* Trigger Button */
+.floating-trigger {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.floating-trigger:hover {
+  transform: scale(1.1) rotate(15deg);
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.6);
+}
+
+.floating-container.expanded .floating-trigger {
+  transform: scale(0.9);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+}
+
+.floating-trigger .trigger-icon {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+/* Mobile Responsive Adjustments */
+@media (max-width: 768px) {
+  .floating-container {
+    bottom: 20px;
+    right: 20px;
+  }
+
+  .floating-action .tooltip {
+    display: none !important;
+  }
+
+  .floating-action {
+    width: auto;
+    height: 46px;
+    border-radius: 23px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .floating-action .mobile-label {
+    display: inline-block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    order: -1; /* Place label to the left of the icon */
+  }
+
+  .floating-action:hover {
+    transform: scale(1.05);
+  }
+}
