@@ -46,9 +46,18 @@ router.post(
 
 router.delete('/:id', protect, admin, deleteTemplate);
 
-import { removeBackground } from '../services/backgroundRemovalService.js';
+import { removeBackground, isBgRemovalEnabled, bgRemovalDisableReason } from '../services/backgroundRemovalService.js';
 router.post('/remove-background', async (req, res) => {
   try {
+    // Check if AI background removal is available
+    if (!isBgRemovalEnabled) {
+      return res.status(503).json({
+        success: false,
+        message: 'AI Background Removal is temporarily unavailable. Please use the Manual Eraser.',
+        reason: bgRemovalDisableReason
+      });
+    }
+
     const { image } = req.body;
     if (!image) {
       return res.status(400).json({ success: false, message: 'Image base64 parameter is required' });

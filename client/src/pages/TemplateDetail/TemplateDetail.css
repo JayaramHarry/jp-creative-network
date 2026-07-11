@@ -530,6 +530,7 @@
   justify-content: center;
   align-items: center;
   flex-shrink: 0;
+  touch-action: none;
 }
 
 .canvas-wrapper {
@@ -553,6 +554,7 @@
   border: 1px dashed transparent;
   cursor: move;
   box-sizing: border-box;
+  touch-action: none;
 }
 
 .layer-interactive-box.active {
@@ -587,6 +589,16 @@
   cursor: se-resize;
 }
 
+/* Expand touch hit area without changing visual size */
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  top: -15px;
+  left: -15px;
+  right: -15px;
+  bottom: -15px;
+}
+
 .rotate-handle {
   position: absolute;
   top: -30px;
@@ -606,6 +618,16 @@
   cursor: grab;
   z-index: 5;
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* Expand touch hit area without changing visual size */
+.rotate-handle::after {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
 }
 
 .rotate-handle:active {

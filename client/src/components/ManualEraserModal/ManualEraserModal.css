@@ -1,0 +1,184 @@
+/* ============================================================
+   ManualEraserModal.css — Full-screen eraser tool modal
+   ============================================================ */
+
+.eraser-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  font-family: 'Inter', 'Outfit', sans-serif;
+}
+
+/* ---------- Top Toolbar ---------- */
+.eraser-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #0f1320;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+  min-height: 48px;
+}
+
+.eraser-toolbar button {
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.eraser-toolbar button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+}
+
+.eraser-toolbar button.active {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #ffffff;
+  border-color: #818cf8;
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+}
+
+.eraser-toolbar button.btn-apply {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  border-color: #34d399;
+  font-weight: 600;
+}
+
+.eraser-toolbar button.btn-apply:hover {
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+.eraser-toolbar button.btn-cancel {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.eraser-toolbar button.btn-cancel:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.eraser-toolbar .toolbar-divider {
+  width: 1px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 4px;
+}
+
+/* ---------- Sliders ---------- */
+.eraser-toolbar .slider-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.eraser-toolbar .slider-group label {
+  color: #94a3b8;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.eraser-toolbar .slider-group input[type="range"] {
+  width: 80px;
+  height: 4px;
+  accent-color: #6366f1;
+  cursor: pointer;
+}
+
+.eraser-toolbar .slider-group .slider-value {
+  color: #e2e8f0;
+  font-size: 0.72rem;
+  min-width: 24px;
+  text-align: right;
+}
+
+/* ---------- Edge Detection Toggle ---------- */
+.eraser-toolbar .edge-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.eraser-toolbar .edge-toggle label {
+  color: #94a3b8;
+  font-size: 0.72rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.eraser-toolbar .edge-toggle input[type="checkbox"] {
+  accent-color: #6366f1;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+/* ---------- Canvas Viewport ---------- */
+.eraser-viewport {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  cursor: crosshair;
+  background:
+    linear-gradient(45deg, #1a1a2e 25%, transparent 25%),
+    linear-gradient(-45deg, #1a1a2e 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #1a1a2e 75%),
+    linear-gradient(-45deg, transparent 75%, #1a1a2e 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+  background-color: #12121f;
+  touch-action: none;
+}
+
+.eraser-viewport canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+/* ---------- Brush Cursor Preview ---------- */
+.eraser-cursor {
+  position: fixed;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 10001;
+  mix-blend-mode: difference;
+}
+
+/* ---------- Mobile Responsive ---------- */
+@media (max-width: 768px) {
+  .eraser-toolbar {
+    padding: 6px 8px;
+    gap: 4px;
+  }
+
+  .eraser-toolbar button {
+    padding: 6px 10px;
+    font-size: 0.72rem;
+  }
+
+  .eraser-toolbar .slider-group input[type="range"] {
+    width: 60px;
+  }
+
+  .eraser-toolbar .toolbar-divider {
+    display: none;
+  }
+}

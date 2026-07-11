@@ -5,6 +5,7 @@ import { AuthContext } from '../../context/AuthContext.js';
 import { downloadBlob } from '../../services/downloadHelper.js';
 import { translateToTelugu } from '../../services/translations.js';
 import './TemplateDetail.css';
+import ManualEraserModal from '../../components/ManualEraserModal/ManualEraserModal.js';
 
 // Pre-defined Font Options
 const FONT_OPTIONS = [
@@ -65,6 +66,7 @@ export default function TemplateDetail() {
   const [cropBgRemovalTolerance, setCropBgRemovalTolerance] = useState(40);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [bgRemovalError, setBgRemovalError] = useState(null);
+  const [isEraserModalOpen, setIsEraserModalOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState(null); // { x, y, layerId }
 
   // Calculate activeLayer at top level
@@ -101,6 +103,7 @@ export default function TemplateDetail() {
   const currentTimeRef = useRef(0);
   const layersRef = useRef(layers);
   const drawCanvasRef = useRef(null);
+  const activePointersRef = useRef(new Map());
 
   useEffect(() => {
     currentTimeRef.current = currentTime;
@@ -979,6 +982,179 @@ export default function TemplateDetail() {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
     }
+  };
+
+  // ============================================================
+  //  Mobile Pointer-based Gesture System
+  //  Provides: single-finger drag, two-finger pinch-to-zoom,
+  //  two-finger rotation. Uses Pointer Capture for smooth tracking.
+  //  Desktop mouse behaviour is completely unchanged (handled above).
+  // ============================================================
+  const gestureBaseRef = useRef(null);
+
+  const handleLayerPointerDown = (e, layer) => {
+    // Only handle touch pointers — mouse uses existing handlers
+    if (e.pointerType !== 'touch') return;
+    if (layer.locked) return;
+    if (!isAdmin() && layer.userEditable === false) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    setActiveLayerId(layer.id);
+
+    const pointers = activePointersRef.current;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    // Capture pointer for smooth off-element tracking
+    try { e.target.setPointerCapture(e.pointerId); } catch (_) {}
+
+    if (pointers.size === 1) {
+      // Single finger: init drag
+      gestureBaseRef.current = {
+        mode: 'drag',
+        startX: e.clientX,
+        startY: e.clientY,
+        initX: layer.x,
+        initY: layer.y,
+        layerId: layer.id
+      };
+    } else if (pointers.size === 2) {
+      // Two fingers: init pinch/rotate
+      const pts = Array.from(pointers.values());
+      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      const angle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
+      gestureBaseRef.current = {
+        mode: 'pinch',
+        baseDist: dist,
+        baseAngle: angle,
+        initWidth: layer.width,
+        initHeight: layer.height,
+        initRotation: layer.rotation || 0,
+        layerId: layer.id
+      };
+    }
+  };
+
+  const handleLayerPointerMove = (e) => {
+    if (e.pointerType !== 'touch') return;
+    e.preventDefault();
+
+    const pointers = activePointersRef.current;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const base = gestureBaseRef.current;
+    if (!base) return;
+
+    if (base.mode === 'drag' && pointers.size === 1) {
+      const dx = (e.clientX - base.startX) / zoomScale;
+      const dy = (e.clientY - base.startY) / zoomScale;
+      updateLayerProperties(base.layerId, { x: base.initX + dx, y: base.initY + dy });
+    } else if (base.mode === 'pinch' && pointers.size === 2) {
+      const pts = Array.from(pointers.values());
+      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      const angle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
+      const scale = dist / base.baseDist;
+      const angleDeg = ((angle - base.baseAngle) * 180) / Math.PI;
+      updateLayerProperties(base.layerId, {
+        width: Math.max(30, Math.round(base.initWidth * scale)),
+        height: Math.max(30, Math.round(base.initHeight * scale)),
+        rotation: Math.round(base.initRotation + angleDeg)
+      });
+    }
+  };
+
+  const handleLayerPointerUp = (e) => {
+    if (e.pointerType !== 'touch') return;
+    const pointers = activePointersRef.current;
+    pointers.delete(e.pointerId);
+
+    if (pointers.size === 0) {
+      gestureBaseRef.current = null;
+      saveStateToHistory();
+    } else if (pointers.size === 1 && gestureBaseRef.current) {
+      // Went from 2 fingers → 1 finger: recalculate drag baseline
+      const remaining = Array.from(pointers.values())[0];
+      const layer = layers.find(l => l.id === gestureBaseRef.current.layerId);
+      if (layer) {
+        gestureBaseRef.current = {
+          mode: 'drag',
+          startX: remaining.x,
+          startY: remaining.y,
+          initX: layer.x,
+          initY: layer.y,
+          layerId: layer.id
+        };
+      }
+    }
+  };
+
+  // Pointer handlers for resize handle (touch only)
+  const handleResizePointerDown = (e, layer) => {
+    if (e.pointerType !== 'touch') return;
+    if (layer.locked) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    try { e.target.setPointerCapture(e.pointerId); } catch (_) {}
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initW = layer.width;
+    const initH = layer.height;
+
+    const onMove = (me) => {
+      me.preventDefault();
+      const dw = (me.clientX - startX) / zoomScale;
+      const dh = (me.clientY - startY) / zoomScale;
+      updateLayerProperties(layer.id, {
+        width: Math.max(30, initW + dw),
+        height: Math.max(30, initH + dh)
+      });
+    };
+
+    const onUp = () => {
+      e.target.removeEventListener('pointermove', onMove);
+      e.target.removeEventListener('pointerup', onUp);
+      e.target.removeEventListener('pointercancel', onUp);
+      saveStateToHistory();
+    };
+
+    e.target.addEventListener('pointermove', onMove);
+    e.target.addEventListener('pointerup', onUp);
+    e.target.addEventListener('pointercancel', onUp);
+  };
+
+  // Pointer handlers for rotate handle (touch only)
+  const handleRotatePointerDown = (e, layer) => {
+    if (e.pointerType !== 'touch') return;
+    if (layer.locked) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    try { e.target.setPointerCapture(e.pointerId); } catch (_) {}
+
+    const element = document.getElementById(`layer-wrapper-${layer.id}`);
+    if (!element) return;
+    const rect = element.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    const onMove = (me) => {
+      me.preventDefault();
+      const angle = Math.atan2(me.clientY - centerY, me.clientX - centerX);
+      let deg = (angle * 180) / Math.PI - 90;
+      updateLayerProperties(layer.id, { rotation: Math.round(deg) });
+    };
+
+    const onUp = () => {
+      e.target.removeEventListener('pointermove', onMove);
+      e.target.removeEventListener('pointerup', onUp);
+      e.target.removeEventListener('pointercancel', onUp);
+      saveStateToHistory();
+    };
+
+    e.target.addEventListener('pointermove', onMove);
+    e.target.addEventListener('pointerup', onUp);
+    e.target.addEventListener('pointercancel', onUp);
   };
 
   // History logic (Undo/Redo)
@@ -1954,58 +2130,15 @@ export default function TemplateDetail() {
     } catch (err) {
       clearTimeout(timeoutId);
       const isTimeout = err.name === 'CanceledError' || err.code === 'ECONNABORTED';
+      // Extract the exact backend error message
+      const backendMsg = err.response?.data?.message;
       const errMsg = isTimeout 
-        ? "AI background removal timed out (took longer than 45 seconds)." 
-        : (err.message || "AI background removal failed.");
+        ? "AI background removal timed out (took longer than 45 seconds). Try using the Manual Eraser instead." 
+        : (backendMsg || err.message || "AI background removal failed.");
 
-      console.warn("[Remove Background] AI API error, executing client chroma-key fallback:", err);
-      setBgRemovalError(`${errMsg} Falling back to automatic color cutout...`);
-      
-      setTimeout(() => {
-        try {
-          setCropBox(activeLayer.cropBox || { left: 0, right: 0, top: 0, bottom: 0 });
-          setCropBgRemovalEnabled(true);
-          
-          // Canvas pixel estimation fallback
-          const analysisCanvas = document.createElement('canvas');
-          analysisCanvas.width = 200;
-          analysisCanvas.height = 200;
-          const analysisCtx = analysisCanvas.getContext('2d');
-          analysisCtx.drawImage(activeLayer.imageObj, 0, 0, 200, 200);
-          
-          const imgData = analysisCtx.getImageData(0, 0, 200, 200);
-          const pixelData = imgData.data;
-          
-          // Sample corner pixels
-          const corners = [
-            { r: pixelData[0], g: pixelData[1], b: pixelData[2] },
-            { r: pixelData[199 * 4], g: pixelData[199 * 4 + 1], b: pixelData[199 * 4 + 2] },
-            { r: pixelData[199 * 200 * 4], g: pixelData[199 * 200 * 4 + 1], b: pixelData[199 * 200 * 4 + 2] },
-            { r: pixelData[(199 * 200 + 199) * 4], g: pixelData[(199 * 200 + 199) * 4 + 1], b: pixelData[(199 * 200 + 199) * 4 + 2] }
-          ];
-          
-          const bgR = Math.round(corners.reduce((sum, c) => sum + c.r, 0) / 4);
-          const bgG = Math.round(corners.reduce((sum, c) => sum + c.g, 0) / 4);
-          const bgB = Math.round(corners.reduce((sum, c) => sum + c.b, 0) / 4);
-          
-          const rgbToHex = (r, g, b) => '#' + [r, g, b].map(x => {
-            const hex = x.toString(16);
-            return hex.length === 1 ? '0' + hex : hex;
-          }).join('');
-          
-          const estimatedHex = rgbToHex(bgR, bgG, bgB);
-          
-          setCropBgRemovalColor(estimatedHex);
-          setCropBgRemovalTolerance(45);
-          setIsCropModalOpen(true);
-          setIsRemovingBg(false);
-          setBgRemovalError(null);
-        } catch (fallbackErr) {
-          console.error("[Remove Background] Fallback failed:", fallbackErr);
-          setBgRemovalError("CORS security limitations on this image prevent canvas pixel extraction. Please download and re-upload the photo directly.");
-          setIsRemovingBg(false);
-        }
-      }, 1500);
+      console.error("[Remove Background] Error:", err);
+      setBgRemovalError(errMsg);
+      setIsRemovingBg(false);
     }
   };
 
@@ -2590,25 +2723,49 @@ export default function TemplateDetail() {
 
             {activeLayer.type !== 'video' && (
               <div className="control-group" style={{ marginBottom: '15px' }}>
-                <button 
-                  type="button"
-                  className="btn btn-secondary w-full" 
-                  onClick={handleRemoveBackground}
-                  disabled={isRemovingBg}
-                  style={{ 
-                    background: isRemovingBg ? '#475569' : 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)', 
-                    color: '#ffffff', 
-                    border: 'none', 
-                    fontWeight: 'bold', 
-                    cursor: isRemovingBg ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  {isRemovingBg ? 'Removing Background...' : '✨ Remove Background'}
-                </button>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: bgRemovalError ? '0' : '0' }}>
+                  <button 
+                    type="button"
+                    className="btn btn-secondary" 
+                    onClick={handleRemoveBackground}
+                    disabled={isRemovingBg}
+                    style={{ 
+                      flex: 1,
+                      background: isRemovingBg ? '#475569' : 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)', 
+                      color: '#ffffff', 
+                      border: 'none', 
+                      fontWeight: 'bold', 
+                      cursor: isRemovingBg ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    {isRemovingBg ? 'Processing...' : '✨ AI Remove'}
+                  </button>
+                  <button 
+                    type="button"
+                    className="btn btn-secondary" 
+                    onClick={() => setIsEraserModalOpen(true)}
+                    style={{ 
+                      flex: 1,
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
+                      color: '#ffffff', 
+                      border: 'none', 
+                      fontWeight: 'bold', 
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    🖌 Manual Eraser
+                  </button>
+                </div>
                 {bgRemovalError && (
                   <div style={{ color: '#fca5a5', fontSize: '0.75rem', marginTop: '6px', lineHeight: '1.2' }}>
                     ⚠️ {bgRemovalError}
@@ -3258,6 +3415,10 @@ export default function TemplateDetail() {
                       transform: `rotate(${layer.rotation}deg)`
                     }}
                     onMouseDown={(e) => handleDragStart(e, layer)}
+                    onPointerDown={(e) => handleLayerPointerDown(e, layer)}
+                    onPointerMove={handleLayerPointerMove}
+                    onPointerUp={handleLayerPointerUp}
+                    onPointerCancel={handleLayerPointerUp}
                     onDoubleClick={(e) => {
                       if (layer.type === 'image' || layer.type === 'symbol') {
                         e.stopPropagation();
@@ -3270,7 +3431,7 @@ export default function TemplateDetail() {
                     }}
                     onTouchStart={(e) => {
                       if (layer.locked) return;
-                      handleDragStart(e, layer);
+                      // Context menu long-press only (drag handled by pointer events)
                       if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
                       touchTimerRef.current = setTimeout(() => {
                         const touch = e.touches[0];
@@ -3293,12 +3454,12 @@ export default function TemplateDetail() {
                         <div 
                           className="resize-handle bottom-right" 
                           onMouseDown={(e) => handleResizeStart(e, layer)}
-                          onTouchStart={(e) => handleResizeStart(e, layer)}
+                          onPointerDown={(e) => handleResizePointerDown(e, layer)}
                         ></div>
                         <div 
                           className="rotate-handle" 
                           onMouseDown={(e) => handleRotateStart(e, layer)}
-                          onTouchStart={(e) => handleRotateStart(e, layer)}
+                          onPointerDown={(e) => handleRotatePointerDown(e, layer)}
                         ></div>
                       </>
                     )}
@@ -3686,6 +3847,29 @@ export default function TemplateDetail() {
           })()}
         </div>
       )}
+
+      {/* Manual Eraser Modal — runs 100% in browser, independent of AI */}
+      <ManualEraserModal
+        isOpen={isEraserModalOpen}
+        imageUrl={activeLayer?.url || (activeLayer?.imageObj?.src) || ''}
+        onApply={(transparentDataUrl) => {
+          if (activeLayerId && transparentDataUrl) {
+            const processedImg = new Image();
+            processedImg.crossOrigin = 'anonymous';
+            processedImg.onload = () => {
+              updateLayerProperties(activeLayerId, {
+                url: transparentDataUrl,
+                originalUrl: transparentDataUrl,
+                imageObj: processedImg
+              });
+              saveStateToHistory();
+            };
+            processedImg.src = transparentDataUrl;
+          }
+          setIsEraserModalOpen(false);
+        }}
+        onCancel={() => setIsEraserModalOpen(false)}
+      />
     </div>
   );
 }

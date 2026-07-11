@@ -21,6 +21,7 @@ import Order from './models/Order.js';
 import User from './models/User.js';
 
 import { protect, admin } from './middlewares/authMiddleware.js';
+import { verifyPythonDependencies } from './services/backgroundRemovalService.js';
 
 // Load env vars
 dotenv.config();
@@ -465,6 +466,8 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  // Verify Python dependencies for AI background removal (non-blocking)
+  await verifyPythonDependencies();
 });

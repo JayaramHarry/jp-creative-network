@@ -6,6 +6,45 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// --- State: AI background removal availability ---
+export let isBgRemovalEnabled = true;
+export let bgRemovalDisableReason = '';
+
+/**
+ * Resolve the Python executable path.
+ * Priority: PYTHON_PATH env var > python3 (Linux/macOS) > python (Windows)
+ */
+const getPythonPath = () => {
+  if (process.env.PYTHON_PATH) return process.env.PYTHON_PATH;
+  return process.platform === 'win32' ? 'python' : 'python3';
+};
+
+/**
+ * Verify Python and required packages are available on startup.
+ * If verification fails, disables the feature gracefully without crashing the server.
+ */
+export const verifyPythonDependencies = () => {
+  return new Promise((resolve) => {
+    const pythonPath = getPythonPath();
+    const checkCmd = `${pythonPath} -c "from rembg import remove; from PIL import Image; print('OK')"`;
+
+    exec(checkCmd, { timeout: 30000 }, (error, stdout, stderr) => {
+      if (error || !stdout.includes('OK')) {
+        isBgRemovalEnabled = false;
+        const errDetail = stderr || error?.message || 'Unknown error';
+        bgRemovalDisableReason = `Python dependency check failed: ${errDetail.trim()}`;
+        console.warn(`[backgroundRemovalService] ⚠️  AI Background Removal DISABLED: ${bgRemovalDisableReason}`);
+        console.warn(`[backgroundRemovalService] The Manual Eraser (client-side) will remain available.`);
+      } else {
+        isBgRemovalEnabled = true;
+        bgRemovalDisableReason = '';
+        console.log(`[backgroundRemovalService] ✅ AI Background Removal verified and ready (python: ${pythonPath})`);
+      }
+      resolve();
+    });
+  });
+};
+
 /**
  * Service to remove background from an image using local Python rembg.
  * @param {string} imageBase64 - The input image base64 string (can include data:image/*;base64, prefix)
@@ -32,12 +71,13 @@ export const removeBackground = (imageBase64) => {
 
       // 4. Resolve python script path
       const pythonScriptPath = path.join(__dirname, 'remove_bg.py');
+      const pythonPath = getPythonPath();
       
       // 5. Execute python script
-      const cmd = `python "${pythonScriptPath}" "${inputPath}" "${outputPath}"`;
+      const cmd = `${pythonPath} "${pythonScriptPath}" "${inputPath}" "${outputPath}"`;
       console.log(`[backgroundRemovalService] Executing: ${cmd}`);
 
-      exec(cmd, { timeout: 60000 }, (error, stdout, stderr) => {
+      exec(cmd, { timeout: 120000 }, (error, stdout, stderr) => {
         // Clean up input file
         try {
           if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
@@ -46,12 +86,13 @@ export const removeBackground = (imageBase64) => {
         }
 
         if (error) {
-          console.error(`[backgroundRemovalService] execution error: ${stderr || error.message}`);
+          const errMsg = stderr || stdout || error.message || "Python script failed";
+          console.error(`[backgroundRemovalService] execution error: ${errMsg}`);
           // Clean up output file if exists
           try {
             if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
           } catch (e) {}
-          return reject(new Error(stderr || error.message || "Python script failed"));
+          return reject(new Error(errMsg));
         }
 
         console.log(`[backgroundRemovalService] stdout: ${stdout}`);
