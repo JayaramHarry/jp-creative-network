@@ -2457,14 +2457,13 @@ export default function TemplateDetail() {
     link.click();
   };
 
-  const handleLayerActionButtonClick = (e, callback) => {
+  const stopGesturePropagation = (e) => {
     e.stopPropagation();
-    const now = Date.now();
-    // Prevent double execution within 300ms (e.g. pointerup + click)
-    if (now - lastActionTimeRef.current < 300) {
-      return;
-    }
-    lastActionTimeRef.current = now;
+  };
+
+  const handleLayerActionButtonClick = (e, layerId, callback) => {
+    e.stopPropagation();
+    setActiveLayerId(layerId);
     callback();
   };
 
@@ -3124,6 +3123,9 @@ export default function TemplateDetail() {
             <button 
               type="button"
               className="btn" 
+              onPointerDown={stopGesturePropagation}
+              onTouchStart={stopGesturePropagation}
+              onMouseDown={stopGesturePropagation}
               onClick={() => duplicateLayer(activeLayer.id)} 
               style={{ flex: 1, background: '#6366f1', color: '#ffffff', border: 'none', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 14px', borderRadius: '6px' }}
             >
@@ -3132,6 +3134,9 @@ export default function TemplateDetail() {
             <button 
               type="button"
               className="btn" 
+              onPointerDown={stopGesturePropagation}
+              onTouchStart={stopGesturePropagation}
+              onMouseDown={stopGesturePropagation}
               onClick={() => deleteLayer(activeLayer.id)} 
               style={{ flex: 1, background: '#ef4444', color: '#ffffff', border: 'none', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 14px', borderRadius: '6px' }}
             >
@@ -3248,34 +3253,44 @@ export default function TemplateDetail() {
                       <span className="layer-name">{layer.name}</span>
                       <div className="layer-actions">
                         <button 
-                          onPointerUp={(e) => handleLayerActionButtonClick(e, () => updateLayerProperties(layer.id, { hidden: !layer.hidden }))}
-                          onClick={(e) => handleLayerActionButtonClick(e, () => updateLayerProperties(layer.id, { hidden: !layer.hidden }))}
+                          onPointerDown={stopGesturePropagation}
+                          onTouchStart={stopGesturePropagation}
+                          onMouseDown={stopGesturePropagation}
+                          onClick={(e) => handleLayerActionButtonClick(e, layer.id, () => updateLayerProperties(layer.id, { hidden: !layer.hidden }))}
                         >
                           {layer.hidden ? '👁️‍🗨️' : '👁️'}
                         </button>
                         <button 
-                          onPointerUp={(e) => handleLayerActionButtonClick(e, () => updateLayerProperties(layer.id, { locked: !layer.locked }))}
-                          onClick={(e) => handleLayerActionButtonClick(e, () => updateLayerProperties(layer.id, { locked: !layer.locked }))}
+                          onPointerDown={stopGesturePropagation}
+                          onTouchStart={stopGesturePropagation}
+                          onMouseDown={stopGesturePropagation}
+                          onClick={(e) => handleLayerActionButtonClick(e, layer.id, () => updateLayerProperties(layer.id, { locked: !layer.locked }))}
                         >
                           {layer.locked ? '🔒' : '🔓'}
                         </button>
                         {layer.type !== 'background' && (
                           <>
                             <button 
-                              onPointerUp={(e) => handleLayerActionButtonClick(e, () => adjustLayerOrder(layer.id, 'forward'))}
-                              onClick={(e) => handleLayerActionButtonClick(e, () => adjustLayerOrder(layer.id, 'forward'))}
+                              onPointerDown={stopGesturePropagation}
+                              onTouchStart={stopGesturePropagation}
+                              onMouseDown={stopGesturePropagation}
+                              onClick={(e) => handleLayerActionButtonClick(e, layer.id, () => adjustLayerOrder(layer.id, 'forward'))}
                             >
                               ▲
                             </button>
                             <button 
-                              onPointerUp={(e) => handleLayerActionButtonClick(e, () => adjustLayerOrder(layer.id, 'backward'))}
-                              onClick={(e) => handleLayerActionButtonClick(e, () => adjustLayerOrder(layer.id, 'backward'))}
+                              onPointerDown={stopGesturePropagation}
+                              onTouchStart={stopGesturePropagation}
+                              onMouseDown={stopGesturePropagation}
+                              onClick={(e) => handleLayerActionButtonClick(e, layer.id, () => adjustLayerOrder(layer.id, 'backward'))}
                             >
                               ▼
                             </button>
                             <button 
-                              onPointerUp={(e) => handleLayerActionButtonClick(e, () => deleteLayer(layer.id))}
-                              onClick={(e) => handleLayerActionButtonClick(e, () => deleteLayer(layer.id))}
+                              onPointerDown={stopGesturePropagation}
+                              onTouchStart={stopGesturePropagation}
+                              onMouseDown={stopGesturePropagation}
+                              onClick={(e) => handleLayerActionButtonClick(e, layer.id, () => deleteLayer(layer.id))}
                             >
                               🗑️
                             </button>
