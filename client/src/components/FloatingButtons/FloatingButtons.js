@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import './FloatingButtons.css';
 
 export default function FloatingButtons() {
   const [expanded, setExpanded] = useState(false);
+  const location = useLocation();
 
   const handleToggle = () => {
     setExpanded(!expanded);
   };
 
+  // Check if we are on the template editor page (/templates/:id)
+  const isTemplateEditor = /^\/templates\/[^/]+$/.test(location.pathname);
+
   return (
-    <div className={`floating-container ${expanded ? 'expanded' : ''}`}>
+    <div className={`floating-container ${expanded ? 'expanded' : ''} ${isTemplateEditor ? 'hide-on-editor-mobile' : ''}`}>
       <div className="floating-menu">
         <a
           href="https://wa.me/919666310391"

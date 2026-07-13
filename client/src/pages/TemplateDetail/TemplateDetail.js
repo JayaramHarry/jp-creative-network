@@ -6,26 +6,12 @@ import { downloadBlob } from '../../services/downloadHelper.js';
 import { translateToTelugu } from '../../services/translations.js';
 import './TemplateDetail.css';
 import ManualEraserModal from '../../components/ManualEraserModal/ManualEraserModal.js';
+import { PRESET_CATEGORIES, PRESET_ITEMS } from './presetsData.js';
 
 // Pre-defined Font Options
 const FONT_OPTIONS = [
   'Outfit', 'Inter', 'Roboto', 'Poppins', 'Montserrat', 'Playfair Display',
   'Suranna', 'NTR', 'Ramabhadra', 'Gidugu', 'sans-serif', 'serif'
-];
-
-// Pre-defined Indian Party Symbols & Badges
-const PRESET_SYMBOLS = [
-  { name: 'Lotus (BJP)', url: 'https://img.icons8.com/color/96/lotus-flower.png' },
-  { name: 'Hand (INC)', url: 'https://img.icons8.com/color/96/hand.png' },
-  { name: 'Broom (AAP)', url: 'https://img.icons8.com/color/96/broom.png' },
-  { name: 'Cycle (SP)', url: 'https://img.icons8.com/color/96/bicycle.png' },
-  { name: 'Ears of Corn & Sickle (CPI)', url: 'https://img.icons8.com/color/96/sickle.png' },
-  { name: 'Social Logo - Facebook', url: 'https://img.icons8.com/color/96/facebook-new.png' },
-  { name: 'Social Logo - Instagram', url: 'https://img.icons8.com/color/96/instagram-new.png' },
-  { name: 'Social Logo - YouTube', url: 'https://img.icons8.com/color/96/youtube-play.png' },
-  { name: 'Social Logo - WhatsApp', url: 'https://img.icons8.com/color/96/whatsapp.png' },
-  { name: 'Badge - Featured', url: 'https://img.icons8.com/color/96/guarantee.png' },
-  { name: 'Badge - Verified', url: 'https://img.icons8.com/color/96/verified-badge.png' }
 ];
 
 export default function TemplateDetail() {
@@ -69,6 +55,11 @@ export default function TemplateDetail() {
   const [isEraserModalOpen, setIsEraserModalOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState(null); // { x, y, layerId }
 
+  // Presets Library Search and Filter States
+  const [presetSearch, setPresetSearch] = useState('');
+  const [selectedPresetCategory, setSelectedPresetCategory] = useState('all');
+  const [dynamicPresets, setDynamicPresets] = useState([]);
+
   // Calculate activeLayer at top level
   const activeLayer = layers.find(l => l.id === activeLayerId);
 
@@ -89,9 +80,7 @@ export default function TemplateDetail() {
   const [bgMusicVolume, setBgMusicVolume] = useState(0.5);
 
   // Upload/gallery database
-  const [uploadGallery, setUploadGallery] = useState([
-    { id: 'mock-test-person', url: '/test_person.jpg' }
-  ]);
+  const [uploadGallery, setUploadGallery] = useState([]);
 
   // Refs
   const canvasRef = useRef(null);
@@ -105,6 +94,17 @@ export default function TemplateDetail() {
   const drawCanvasRef = useRef(null);
   const activePointersRef = useRef(new Map());
   const lastActionTimeRef = useRef(0);
+  const mobileTextInputRef = useRef(null);
+  const canvasMobileTextInputRef = useRef(null);
+  const lastTapRef = useRef({ time: 0, layerId: null });
+
+  const focusCanvasMobileTextInput = () => {
+    if (canvasMobileTextInputRef.current) {
+      canvasMobileTextInputRef.current.focus();
+      const len = canvasMobileTextInputRef.current.value.length;
+      canvasMobileTextInputRef.current.setSelectionRange(len, len);
+    }
+  };
 
   useEffect(() => {
     currentTimeRef.current = currentTime;
@@ -114,6 +114,39 @@ export default function TemplateDetail() {
   useEffect(() => {
     layersRef.current = layers;
   }, [layers]);
+
+  // Load dynamic presets uploaded by Admin
+  useEffect(() => {
+    const fetchDynamicPresets = async () => {
+      try {
+        const { data } = await API.get('/presets');
+        if (data.success) {
+          setDynamicPresets(data.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch dynamic presets:', err);
+      }
+    };
+    fetchDynamicPresets();
+  }, []);
+
+  // Auto-focus text input on mobile/tablet when a text layer is selected and Text tab is active
+  useEffect(() => {
+    if (activeTab === 'text' && activeLayer && activeLayer.type === 'text') {
+      const focusInput = () => {
+        if (mobileTextInputRef.current) {
+          mobileTextInputRef.current.focus();
+          const len = mobileTextInputRef.current.value.length;
+          mobileTextInputRef.current.setSelectionRange(len, len);
+        }
+      };
+      // Try focusing in the next frame
+      requestAnimationFrame(focusInput);
+      // Fallback timeout for touch keyboards
+      const timer = setTimeout(focusInput, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [activeLayerId, activeTab, activeLayer]);
 
   // Timescale computation including 10s buffer space
   const origDur = template?.type === 'video' && videoRef.current?.duration ? videoRef.current.duration : 10;
@@ -1005,6 +1038,24 @@ export default function TemplateDetail() {
     if (layer.locked) return;
     if (!isAdmin() && layer.userEditable === false) return;
 
+    // Custom Double-tap detection for mobile/tablet to focus the hidden direct editor input
+    const now = Date.now();
+    const doubleTapThreshold = 300; // ms
+    if (lastTapRef.current.layerId === layer.id && now - lastTapRef.current.time < doubleTapThreshold) {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveLayerId(layer.id);
+      
+      // Focus direct text editor input
+      if (layer.type === 'text') {
+        focusCanvasMobileTextInput();
+      }
+      
+      lastTapRef.current = { time: 0, layerId: null };
+      return;
+    }
+    lastTapRef.current = { time: now, layerId: layer.id };
+
     e.preventDefault();
     e.stopPropagation();
     setActiveLayerId(layer.id);
@@ -1292,6 +1343,8 @@ export default function TemplateDetail() {
     };
     const updated = [...layers, newL];
     setLayers(updated);
+    setActiveLayerId(newL.id);
+    setActiveTab('text');
     saveStateToHistory(updated);
   };
 
@@ -1434,6 +1487,28 @@ export default function TemplateDetail() {
     saveStateToHistory(updated);
   };
 
+  const bringToFront = (layerId) => {
+    const index = layers.findIndex(l => l.id === layerId);
+    if (index === -1 || index === layers.length - 1) return;
+    const updated = [...layers];
+    const layer = updated.splice(index, 1)[0];
+    updated.push(layer);
+    setLayers(updated);
+    saveStateToHistory(updated);
+  };
+
+  const sendToBack = (layerId) => {
+    const index = layers.findIndex(l => l.id === layerId);
+    if (index === -1) return;
+    const updated = [...layers];
+    const layer = updated.splice(index, 1)[0];
+    const targetIndex = updated.length > 0 && updated[0].type === 'background' ? 1 : 0;
+    if (index === targetIndex) return; // Already at the bottom
+    updated.splice(targetIndex, 0, layer);
+    setLayers(updated);
+    saveStateToHistory(updated);
+  };
+
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1446,6 +1521,7 @@ export default function TemplateDetail() {
     });
 
     const fileUrl = URL.createObjectURL(file);
+    setUploadGallery(prev => [...prev, { id: `upload-${Date.now()}-${Math.round(Math.random() * 1e5)}`, url: fileUrl }]);
     const isVideo = file.type.startsWith('video/');
     const isReplacing = e.target.id === 'user-photo-upload' && activeLayer && (activeLayer.type === 'image' || activeLayer.type === 'video' || activeLayer.type === 'symbol');
 
@@ -1710,7 +1786,29 @@ export default function TemplateDetail() {
   };
 
   // Handle Preset Symbol clicks
-  const selectPresetSymbol = (url, name) => {
+  const selectPresetSymbol = (url, name, category) => {
+    let width = 120;
+    let height = 120;
+    let x = 300;
+    let y = 300;
+
+    if (category === 'ribbons') {
+      width = 400;
+      height = 70;
+      x = 340;
+      y = 800;
+    } else if (category === 'nameplates') {
+      width = 300;
+      height = 75;
+      x = 390;
+      y = 700;
+    } else if (category === 'borders') {
+      width = 600;
+      height = 600;
+      x = 240;
+      y = 240;
+    }
+
     const newL = {
       id: `symbol-${Date.now()}`,
       type: 'symbol',
@@ -1718,10 +1816,10 @@ export default function TemplateDetail() {
       url: url,
       originalUrl: url,
       cropBox: { left: 0, right: 0, top: 0, bottom: 0 },
-      x: 300,
-      y: 300,
-      width: 120,
-      height: 120,
+      x: x,
+      y: y,
+      width: width,
+      height: height,
       rotation: 0,
       opacity: 1,
       startTime: 0,
@@ -3119,30 +3217,79 @@ export default function TemplateDetail() {
         )}
 
         {activeLayer.type !== 'background' && (
-          <div className="control-group" style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', gap: '8px' }}>
-            <button 
-              type="button"
-              className="btn" 
-              onPointerDown={stopGesturePropagation}
-              onTouchStart={stopGesturePropagation}
-              onMouseDown={stopGesturePropagation}
-              onClick={() => duplicateLayer(activeLayer.id)} 
-              style={{ flex: 1, background: '#6366f1', color: '#ffffff', border: 'none', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 14px', borderRadius: '6px' }}
-            >
-              📋 {language === 'en' ? 'Duplicate' : 'నకలు'}
-            </button>
-            <button 
-              type="button"
-              className="btn" 
-              onPointerDown={stopGesturePropagation}
-              onTouchStart={stopGesturePropagation}
-              onMouseDown={stopGesturePropagation}
-              onClick={() => deleteLayer(activeLayer.id)} 
-              style={{ flex: 1, background: '#ef4444', color: '#ffffff', border: 'none', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 14px', borderRadius: '6px' }}
-            >
-              🗑️ {language === 'en' ? 'Delete' : 'తొలగించు'}
-            </button>
-          </div>
+          <>
+            <div className="control-group" style={{ marginTop: '15px', display: 'flex', gap: '8px' }}>
+              <button 
+                type="button"
+                className="btn-sm" 
+                onPointerDown={stopGesturePropagation}
+                onTouchStart={stopGesturePropagation}
+                onMouseDown={stopGesturePropagation}
+                onClick={() => adjustLayerOrder(activeLayer.id, 'forward')}
+                style={{ flex: 1, background: '#374151', color: '#ffffff', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}
+              >
+                ▲ {language === 'en' ? 'Up' : 'పైకి'}
+              </button>
+              <button 
+                type="button"
+                className="btn-sm" 
+                onPointerDown={stopGesturePropagation}
+                onTouchStart={stopGesturePropagation}
+                onMouseDown={stopGesturePropagation}
+                onClick={() => adjustLayerOrder(activeLayer.id, 'backward')}
+                style={{ flex: 1, background: '#374151', color: '#ffffff', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}
+              >
+                ▼ {language === 'en' ? 'Down' : 'క్రిందికి'}
+              </button>
+              <button 
+                type="button"
+                className="btn-sm" 
+                onPointerDown={stopGesturePropagation}
+                onTouchStart={stopGesturePropagation}
+                onMouseDown={stopGesturePropagation}
+                onClick={() => bringToFront(activeLayer.id)}
+                style={{ flex: 1, background: '#374151', color: '#ffffff', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}
+              >
+                🔝 {language === 'en' ? 'Front' : 'పైభాగం'}
+              </button>
+              <button 
+                type="button"
+                className="btn-sm" 
+                onPointerDown={stopGesturePropagation}
+                onTouchStart={stopGesturePropagation}
+                onMouseDown={stopGesturePropagation}
+                onClick={() => sendToBack(activeLayer.id)}
+                style={{ flex: 1, background: '#374151', color: '#ffffff', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}
+              >
+                🔚 {language === 'en' ? 'Back' : 'క్రిందిభాగం'}
+              </button>
+            </div>
+
+            <div className="control-group" style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', gap: '8px' }}>
+              <button 
+                type="button"
+                className="btn" 
+                onPointerDown={stopGesturePropagation}
+                onTouchStart={stopGesturePropagation}
+                onMouseDown={stopGesturePropagation}
+                onClick={() => duplicateLayer(activeLayer.id)} 
+                style={{ flex: 1, background: '#6366f1', color: '#ffffff', border: 'none', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 14px', borderRadius: '6px' }}
+              >
+                📋 {language === 'en' ? 'Duplicate' : 'నకలు'}
+              </button>
+              <button 
+                type="button"
+                className="btn" 
+                onPointerDown={stopGesturePropagation}
+                onTouchStart={stopGesturePropagation}
+                onMouseDown={stopGesturePropagation}
+                onClick={() => deleteLayer(activeLayer.id)} 
+                style={{ flex: 1, background: '#ef4444', color: '#ffffff', border: 'none', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 14px', borderRadius: '6px' }}
+              >
+                🗑️ {language === 'en' ? 'Delete' : 'తొలగించు'}
+              </button>
+            </div>
+          </>
         )}
       </div>
     );
@@ -3245,7 +3392,7 @@ export default function TemplateDetail() {
               <div className="panel-content layers-panel">
                 <h2>Layers Manager</h2>
                 <div className="layer-list">
-                  {layers.map((layer) => (
+                  {[...layers].reverse().map((layer) => (
                     <div key={layer.id} className={`layer-item ${activeLayerId === layer.id ? 'active' : ''} ${layer.locked ? 'locked' : ''}`} onClick={() => setActiveLayerId(layer.id)}>
                       <span className="layer-type-icon">
                         {layer.type === 'background' ? '🖼️' : layer.type === 'text' ? '🔤' : '📷'}
@@ -3270,11 +3417,26 @@ export default function TemplateDetail() {
                         </button>
                         {layer.type !== 'background' && (
                           <>
+                            {layer.type === 'text' && (
+                              <button 
+                                onPointerDown={stopGesturePropagation}
+                                onTouchStart={stopGesturePropagation}
+                                onMouseDown={stopGesturePropagation}
+                                onClick={(e) => handleLayerActionButtonClick(e, layer.id, () => {
+                                  setActiveTab(null); // Close panel
+                                  focusCanvasMobileTextInput();
+                                })}
+                                title="Edit text content directly"
+                              >
+                                ✍️
+                              </button>
+                            )}
                             <button 
                               onPointerDown={stopGesturePropagation}
                               onTouchStart={stopGesturePropagation}
                               onMouseDown={stopGesturePropagation}
                               onClick={(e) => handleLayerActionButtonClick(e, layer.id, () => adjustLayerOrder(layer.id, 'forward'))}
+                              title="Move Up"
                             >
                               ▲
                             </button>
@@ -3283,6 +3445,7 @@ export default function TemplateDetail() {
                               onTouchStart={stopGesturePropagation}
                               onMouseDown={stopGesturePropagation}
                               onClick={(e) => handleLayerActionButtonClick(e, layer.id, () => adjustLayerOrder(layer.id, 'backward'))}
+                              title="Move Down"
                             >
                               ▼
                             </button>
@@ -3290,7 +3453,26 @@ export default function TemplateDetail() {
                               onPointerDown={stopGesturePropagation}
                               onTouchStart={stopGesturePropagation}
                               onMouseDown={stopGesturePropagation}
+                              onClick={(e) => handleLayerActionButtonClick(e, layer.id, () => bringToFront(layer.id))}
+                              title="Bring to Front"
+                            >
+                              🔝
+                            </button>
+                            <button 
+                              onPointerDown={stopGesturePropagation}
+                              onTouchStart={stopGesturePropagation}
+                              onMouseDown={stopGesturePropagation}
+                              onClick={(e) => handleLayerActionButtonClick(e, layer.id, () => sendToBack(layer.id))}
+                              title="Send to Back"
+                            >
+                              🔚
+                            </button>
+                            <button 
+                              onPointerDown={stopGesturePropagation}
+                              onTouchStart={stopGesturePropagation}
+                              onMouseDown={stopGesturePropagation}
                               onClick={(e) => handleLayerActionButtonClick(e, layer.id, () => deleteLayer(layer.id))}
+                              title="Delete"
                             >
                               🗑️
                             </button>
@@ -3307,6 +3489,31 @@ export default function TemplateDetail() {
               <div className="panel-content text-panel">
                 <h2>Text Controls</h2>
                 <button className="btn-add-layer" onClick={addTextLayer}>➕ Add Custom Text Box</button>
+                
+                {activeLayer && activeLayer.type === 'text' && (
+                  <div className="text-editor-section" style={{ marginTop: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '15px' }}>
+                    <div className="control-group">
+                      <label style={{ fontSize: '0.85rem', color: '#a5b4fc', display: 'block', marginBottom: '8px' }}>✍️ Edit Text Content</label>
+                      <textarea
+                        ref={mobileTextInputRef}
+                        value={activeLayer.text}
+                        onChange={(e) => updateLayerProperties(activeLayerId, { text: e.target.value })}
+                        style={{
+                          width: '100%',
+                          height: '80px',
+                          background: 'rgba(0, 0, 0, 0.25)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '6px',
+                          color: '#ffffff',
+                          padding: '10px',
+                          fontSize: '1rem',
+                          fontFamily: activeLayer.fontFamily || 'Outfit',
+                          resize: 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -3336,7 +3543,7 @@ export default function TemplateDetail() {
                 
                 <div className="uploads-gallery">
                   {uploadGallery.map((img) => (
-                    <div key={img.id} className="gallery-item" onClick={() => {
+                    <div key={img.id} className="gallery-item" style={{ position: 'relative' }} onClick={() => {
                       const image = new Image();
                       image.crossOrigin = 'anonymous';
                       image.src = img.url;
@@ -3375,6 +3582,32 @@ export default function TemplateDetail() {
                       };
                     }}>
                       <img src={img.url} alt="Uploaded Item" />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUploadGallery(prev => prev.filter(item => item.id !== img.id));
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: '4px',
+                          right: '4px',
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '50%',
+                          background: 'rgba(0,0,0,0.6)',
+                          border: 'none',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '10px',
+                          cursor: 'pointer',
+                          lineHeight: 1,
+                          padding: 0
+                        }}
+                      >
+                        ✕
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -3383,15 +3616,146 @@ export default function TemplateDetail() {
 
             {activeTab === 'presets' && (
               <div className="panel-content presets-panel">
-                <h2>Party Symbols & Badges</h2>
-                <div className="presets-grid">
-                  {PRESET_SYMBOLS.map((sym, idx) => (
-                    <div key={idx} className="preset-item" onClick={() => selectPresetSymbol(sym.url, sym.name)}>
-                      <img src={sym.url} alt={sym.name} />
-                      <span>{sym.name}</span>
-                    </div>
+                <h2>Design Presets</h2>
+                
+                {/* Search Bar */}
+                <div className="preset-search-container" style={{ marginBottom: '15px' }}>
+                  <input
+                    type="text"
+                    placeholder="Search presets..."
+                    value={presetSearch}
+                    onChange={(e) => setPresetSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      background: 'rgba(0, 0, 0, 0.25)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: '#ffffff',
+                      fontSize: '0.9rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                {/* Categories Scroll */}
+                <div className="preset-categories-scroll" style={{
+                  display: 'flex',
+                  gap: '8px',
+                  overflowX: 'auto',
+                  paddingBottom: '10px',
+                  marginBottom: '15px',
+                  whiteSpace: 'nowrap',
+                  scrollbarWidth: 'none' // Hide scrollbar in Firefox
+                }}>
+                  <button
+                    className={`category-pill ${selectedPresetCategory === 'all' ? 'active' : ''}`}
+                    onClick={() => setSelectedPresetCategory('all')}
+                    style={{
+                      padding: '6px 12px',
+                      background: selectedPresetCategory === 'all' ? 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)' : 'rgba(255,255,255,0.06)',
+                      border: 'none',
+                      borderRadius: '20px',
+                      color: '#ffffff',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    All
+                  </button>
+                  {PRESET_CATEGORIES.map(cat => (
+                    <button
+                      key={cat.id}
+                      className={`category-pill ${selectedPresetCategory === cat.id ? 'active' : ''}`}
+                      onClick={() => setSelectedPresetCategory(cat.id)}
+                      style={{
+                        padding: '6px 12px',
+                        background: selectedPresetCategory === cat.id ? 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)' : 'rgba(255,255,255,0.06)',
+                        border: 'none',
+                        borderRadius: '20px',
+                        color: '#ffffff',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {cat.name}
+                    </button>
                   ))}
                 </div>
+
+                {/* Grid list */}
+                <div className="presets-grid" style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
+                  gap: '12px',
+                  maxHeight: '300px',
+                  overflowY: 'auto',
+                  paddingRight: '4px'
+                }}>
+                  {(() => {
+                    const mappedDynamic = dynamicPresets.map(dp => {
+                      let cleanUrl = dp.url;
+                      if (!cleanUrl.startsWith('http') && !cleanUrl.startsWith('/')) {
+                        cleanUrl = `/uploads/${cleanUrl}`;
+                      }
+                      return {
+                        id: dp._id,
+                        category: dp.category,
+                        name: dp.name,
+                        url: cleanUrl
+                      };
+                    });
+                    const allPresets = [...PRESET_ITEMS, ...mappedDynamic];
+                    
+                    const filtered = allPresets.filter(item => {
+                      const matchesCategory = selectedPresetCategory === 'all' || item.category === selectedPresetCategory;
+                      const matchesSearch = item.name.toLowerCase().includes(presetSearch.toLowerCase());
+                      return matchesCategory && matchesSearch;
+                    });
+
+                    if (filtered.length === 0) {
+                      return <p style={{ color: 'rgba(255,255,255,0.4)', gridColumn: '1/-1', textAlign: 'center', margin: '20px 0' }}>No presets found.</p>;
+                    }
+
+                    return filtered.map(item => (
+                      <div
+                        key={item.id}
+                        className="preset-item"
+                        onClick={() => selectPresetSymbol(item.url, item.name, item.category)}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.03)',
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                          borderRadius: '8px',
+                          padding: '10px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '6px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          textAlign: 'center'
+                        }}
+                      >
+                        <div style={{ width: '50px', height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                          <img
+                            src={item.url}
+                            alt={item.name}
+                            loading="lazy"
+                            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                          />
+                        </div>
+                        <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                          {item.name}
+                        </span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+
                 <button className="btn-add-layer" onClick={addShapeLayer} style={{ marginTop: '20px' }}>
                   ➕ Add Rectangle Shape
                 </button>
@@ -3538,6 +3902,10 @@ export default function TemplateDetail() {
                       if (layer.type === 'image' || layer.type === 'symbol') {
                         e.stopPropagation();
                         triggerReplacePhoto(layer.id);
+                      } else if (layer.type === 'text') {
+                        e.stopPropagation();
+                        setActiveLayerId(layer.id);
+                        focusCanvasMobileTextInput();
                       }
                     }}
                     onContextMenu={(e) => {
@@ -3939,6 +4307,12 @@ export default function TemplateDetail() {
                       </div>
                     </>
                   )}
+                  <div className="context-menu-item" onClick={() => { setContextMenu(null); bringToFront(layer.id); }}>
+                    🔝 {language === 'en' ? 'Bring to Front' : 'ముందుకు తీసుకురండి'}
+                  </div>
+                  <div className="context-menu-item" onClick={() => { setContextMenu(null); sendToBack(layer.id); }}>
+                    🔚 {language === 'en' ? 'Send to Back' : 'వెనుకకు పంపండి'}
+                  </div>
                   <div className="context-menu-item" onClick={() => { setContextMenu(null); duplicateLayer(layer.id); }}>
                     📋 {language === 'en' ? 'Duplicate Photo' : 'ఫోటో నకలు చేయండి'}
                   </div>
@@ -3950,6 +4324,12 @@ export default function TemplateDetail() {
             } else {
               return (
                 <>
+                  <div className="context-menu-item" onClick={() => { setContextMenu(null); bringToFront(layer.id); }}>
+                    🔝 {language === 'en' ? 'Bring to Front' : 'ముందుకు తీసుకురండి'}
+                  </div>
+                  <div className="context-menu-item" onClick={() => { setContextMenu(null); sendToBack(layer.id); }}>
+                    🔚 {language === 'en' ? 'Send to Back' : 'వెనుకకు పంపండి'}
+                  </div>
                   <div className="context-menu-item" onClick={() => { setContextMenu(null); duplicateLayer(layer.id); }}>
                     📋 {language === 'en' ? 'Duplicate Layer' : 'లేయర్ నకలు చేయండి'}
                   </div>
@@ -3962,6 +4342,28 @@ export default function TemplateDetail() {
           })()}
         </div>
       )}
+
+      {/* Hidden textarea for direct mobile text editing on canvas */}
+      <textarea
+        ref={canvasMobileTextInputRef}
+        value={activeLayer && activeLayer.type === 'text' ? activeLayer.text : ''}
+        onChange={(e) => {
+          if (activeLayerId) {
+            updateLayerProperties(activeLayerId, { text: e.target.value });
+          }
+        }}
+        disabled={!activeLayer || activeLayer.type !== 'text'}
+        style={{
+          position: 'absolute',
+          opacity: 0,
+          pointerEvents: 'none',
+          width: '1px',
+          height: '1px',
+          top: '-100px',
+          left: '-100px',
+          zIndex: -9999
+        }}
+      />
 
       {/* Manual Eraser Modal — runs 100% in browser, independent of AI */}
       <ManualEraserModal

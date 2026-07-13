@@ -199,3 +199,13 @@
     transform: scale(1.05);
   }
 }
+
+/* Hide chat/social container on mobile/tablet devices when on the template editor page */
+@media (max-width: 1024px) {
+  .floating-container.hide-on-editor-mobile {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+}

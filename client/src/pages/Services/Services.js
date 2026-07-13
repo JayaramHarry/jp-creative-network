@@ -32,6 +32,9 @@ const getServiceBackgroundImage = (title) => {
   if (t.includes('digital marketing') || t.includes('marketing')) {
     return 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=600&auto=format&fit=crop';
   }
+  if (t.includes('song') || t.includes('custom song')) {
+    return 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=600&auto=format&fit=crop';
+  }
   return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop';
 };
 
@@ -70,7 +73,30 @@ export default function Services() {
         setLoading(true);
         const { data } = await API.get('/services');
         if (data.success) {
-          setServices(data.data);
+          const loaded = [...data.data];
+          if (!loaded.some(s => s.title.toLowerCase().includes('custom song'))) {
+            const customSong = {
+              _id: 'custom-song-service-static',
+              title: 'Custom Song',
+              price: 'Starting at ₹999',
+              description: 'Get professionally customized songs for birthdays, anniversaries, weddings, political campaigns, business promotions, love stories, invitations, baby showers, farewell events, and all special occasions.',
+              features: [
+                'Personalized lyrics',
+                'Male/Female vocals',
+                'Multiple language support',
+                'Studio-quality music',
+                'Fast delivery'
+              ],
+              isCustomSong: true
+            };
+            const videoIndex = loaded.findIndex(s => s.title.toLowerCase().includes('video editing'));
+            if (videoIndex !== -1) {
+              loaded.splice(videoIndex + 1, 0, customSong);
+            } else {
+              loaded.push(customSong);
+            }
+          }
+          setServices(loaded);
         }
       } catch (err) {
         console.error('Error fetching services:', err);
@@ -177,6 +203,7 @@ export default function Services() {
                  service.title.toLowerCase().includes('sales') ? '📈' :
                  service.title.toLowerCase().includes('social') ? '📱' :
                  service.title.toLowerCase().includes('fan') ? '👑' :
+                 service.title.toLowerCase().includes('song') || service.title.toLowerCase().includes('custom song') ? '🎵' :
                  service.title.toLowerCase().includes('business') ? '💼' : '🎨'}
               </span>
             </div>
@@ -185,13 +212,23 @@ export default function Services() {
               <h3>{service.title}</h3>
               <p>{service.description}</p>
               
+              {service.features && (
+                <ul className="service-features-list" style={{ listStyle: 'none', padding: 0, margin: '5px 0 0 0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {service.features.map((feat, idx) => (
+                    <li key={idx} style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ color: 'var(--secondary)' }}>•</span> {feat}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              
               <div className="service-footer-row">
                 <span className="service-price-tag-value">{service.price || 'Contact for price'}</span>
                 <button 
                   onClick={() => openInquiryModal(service)}
                   className="btn btn-primary btn-sm service-inquire-btn"
                 >
-                  Inquire Now
+                  {service.isCustomSong ? 'Order Now' : 'Inquire Now'}
                 </button>
               </div>
             </div>

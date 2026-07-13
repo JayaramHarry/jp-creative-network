@@ -1318,18 +1318,20 @@
   background: #1e293b !important;
 }
 
-/* Hide third-party chat widgets on this editor page to prevent overlapping tab buttons */
-#crisp-client,
-.crisp-client,
-#tawkchat-container,
-.tawk-minimized,
-#chat-widget-container,
-iframe[name="friendly-iframe"],
-iframe[id^="chat-widget"],
-iframe[src*="crisp"],
-iframe[src*="tawk"] {
-  display: none !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
+/* Hide third-party chat widgets on this editor page to prevent overlapping tab buttons on mobile/tablet */
+@media (max-width: 1024px) {
+  #crisp-client,
+  .crisp-client,
+  #tawkchat-container,
+  .tawk-minimized,
+  #chat-widget-container,
+  iframe[name="friendly-iframe"],
+  iframe[id^="chat-widget"],
+  iframe[src*="crisp"],
+  iframe[src*="tawk"] {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
 }
 

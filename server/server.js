@@ -12,6 +12,7 @@ import templateRoutes from './routes/templateRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import serviceRoutes from './routes/serviceRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
+import presetRoutes from './routes/presetRoutes.js';
 
 // Models for seed/admin endpoints
 import Category from './models/Category.js';
@@ -33,15 +34,17 @@ await connectDB();
 try {
   const userCount = await User.countDocuments({});
   if (userCount === 0) {
-    console.log('Database empty. Automatically seeding default administrator account...');
+    const adminEmail = process.env.ADMIN_EMAIL || 'jayaprakashnetha1@gmail.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'JPCreativeAdmin2026#';
+    console.log(`Database empty. Automatically seeding default administrator account: ${adminEmail}...`);
     await User.create({
       name: 'admin',
-      email: 'admin@jpcreateworks.com',
-      password: 'adminpassword',
+      email: adminEmail.toLowerCase().trim(),
+      password: adminPassword,
       role: 'admin',
       isEmailVerified: true,
     });
-    console.log('Successfully seeded default administrator (admin@jpcreateworks.com / adminpassword)');
+    console.log(`Successfully seeded default administrator (${adminEmail})`);
   }
 } catch (err) {
   console.error('Auto-seed check failed:', err.message);
@@ -64,6 +67,7 @@ app.use('/api/templates', templateRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/presets', presetRoutes);
 
 app.get('/api/admin/stats', protect, admin, async (req, res) => {
   try {
@@ -153,40 +157,26 @@ app.post('/api/seed', async (req, res) => {
       }
     }
 
-    // Seed test user harry for testing customizers and free downloads
-    let harryUser = await User.findOne({ email: 'harry@jpcreateworks.com' });
-    if (!harryUser) {
-      await User.create({
-        name: 'harry',
-        email: 'harry@jpcreateworks.com',
-        password: '12345678',
-        role: 'user',
-        isEmailVerified: true,
-      });
-      console.log('Seeded test user harry successfully');
-    } else if (!harryUser.isEmailVerified) {
-      harryUser.isEmailVerified = true;
-      await harryUser.save();
-      console.log('Updated test user harry to verified status');
-    }
-
-    // Seed test admin user for dashboard testing
-    let adminUser = await User.findOne({ email: 'admin@jpcreateworks.com' });
+    // Seed default administrator if specified or default to jayaprakashnetha1@gmail.com
+    const adminEmail = (process.env.ADMIN_EMAIL || 'jayaprakashnetha1@gmail.com').toLowerCase().trim();
+    const adminPassword = process.env.ADMIN_PASSWORD || 'JPCreativeAdmin2026#';
+    
+    let adminUser = await User.findOne({ email: adminEmail });
     if (!adminUser) {
       await User.create({
         name: 'admin',
-        email: 'admin@jpcreateworks.com',
-        password: 'adminpassword',
+        email: adminEmail,
+        password: adminPassword,
         role: 'admin',
         isEmailVerified: true,
       });
-      console.log('Seeded test admin successfully');
+      console.log(`Seeded administrator (${adminEmail}) successfully`);
     } else {
       if (adminUser.role !== 'admin' || !adminUser.isEmailVerified) {
         adminUser.role = 'admin';
         adminUser.isEmailVerified = true;
         await adminUser.save();
-        console.log('Updated test admin status successfully');
+        console.log(`Updated administrator (${adminEmail}) status successfully`);
       }
     }
 

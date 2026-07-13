@@ -14,6 +14,15 @@ export default function AdminDashboard() {
   const [contacts, setContacts] = useState([]);
   const [customDesigns, setCustomDesigns] = useState([]);
   const [services, setServices] = useState([]);
+  const [presets, setPresets] = useState([]);
+
+  // Presets Form States
+  const [presetId, setPresetId] = useState(null);
+  const [presetName, setPresetName] = useState('');
+  const [presetCategory, setPresetCategory] = useState('political');
+  const [presetTags, setPresetTags] = useState('');
+  const [presetEnabled, setPresetEnabled] = useState(true);
+  const [presetFile, setPresetFile] = useState(null);
 
   // Seeding/Loading states
   const [loading, setLoading] = useState(false);
@@ -103,6 +112,9 @@ export default function AdminDashboard() {
       } else if (activeTab === 'services') {
         const { data } = await API.get('/services');
         if (data.success) setServices(data.data);
+      } else if (activeTab === 'presets') {
+        const { data } = await API.get('/presets?all=true');
+        if (data.success) setPresets(data.data);
       }
     } catch (err) {
       console.error('Error fetching admin dashboard details:', err);
@@ -430,6 +442,84 @@ export default function AdminDashboard() {
     }
   };
 
+  // Preset CRUD Handlers
+  const handlePresetSubmit = async (e) => {
+    e.preventDefault();
+    if (!presetName || !presetCategory || (!presetId && !presetFile)) {
+      showStatus('Please fill in name, category, and upload a file.', 'error');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const formData = new FormData();
+      formData.append('name', presetName);
+      formData.append('category', presetCategory);
+      formData.append('tags', presetTags);
+      formData.append('enabled', presetEnabled);
+      if (presetFile) {
+        formData.append('file', presetFile);
+      }
+
+      let res;
+      if (presetId) {
+        res = await API.put(`/presets/${presetId}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      } else {
+        res = await API.post('/presets', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      }
+
+      if (res.data.success) {
+        showStatus(presetId ? 'Preset updated successfully!' : 'Preset created successfully!');
+        resetPresetForm();
+        fetchAdminData();
+      }
+    } catch (err) {
+      console.error(err);
+      showStatus('Failed to save preset: ' + (err.response?.data?.message || err.message), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEditPreset = (preset) => {
+    setPresetId(preset._id);
+    setPresetName(preset.name);
+    setPresetCategory(preset.category);
+    setPresetTags(preset.tags ? preset.tags.join(', ') : '');
+    setPresetEnabled(preset.enabled);
+    setPresetFile(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const resetPresetForm = () => {
+    setPresetId(null);
+    setPresetName('');
+    setPresetCategory('political');
+    setPresetTags('');
+    setPresetEnabled(true);
+    setPresetFile(null);
+    const el = document.getElementById('preset-file-input');
+    if (el) el.value = '';
+  };
+
+  const handleDeletePreset = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this preset?')) return;
+    try {
+      const { data } = await API.delete(`/presets/${id}`);
+      if (data.success) {
+        showStatus('Preset deleted successfully!');
+        fetchAdminData();
+      }
+    } catch (err) {
+      console.error(err);
+      showStatus('Failed to delete preset.', 'error');
+    }
+  };
+
   const selectedCatObj = categories.find((c) => c._id === tplCategory);
   const isPoliticalCategory = selectedCatObj && (selectedCatObj.slug === 'political' || selectedCatObj.name === 'Political');
 
@@ -457,6 +547,7 @@ export default function AdminDashboard() {
         <button className={`admin-tab-btn ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>👥 Users</button>
         <button className={`admin-tab-btn ${activeTab === 'inquiries' ? 'active' : ''}`} onClick={() => setActiveTab('inquiries')}>✉️ Inquiries</button>
         <button className={`admin-tab-btn ${activeTab === 'services' ? 'active' : ''}`} onClick={() => setActiveTab('services')}>🛠️ Services</button>
+        <button className={`admin-tab-btn ${activeTab === 'presets' ? 'active' : ''}`} onClick={() => setActiveTab('presets')}>🎨 Presets</button>
       </div>
 
       {loading ? (
@@ -924,6 +1015,186 @@ export default function AdminDashboard() {
                           </td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* Tab 8: Presets Manager */}
+          {activeTab === 'presets' && (
+            <div className="admin-presets-panel fade-in-up">
+              <div className="admin-split-grid">
+                
+                {/* Preset Form */}
+                <form onSubmit={handlePresetSubmit} className="admin-form glass-card">
+                  <h2>{presetId ? 'Edit Preset Asset' : 'Add New Preset Asset'}</h2>
+                  
+                  <div className="form-group">
+                    <label className="form-label">Preset Name</label>
+                    <input
+                      type="text"
+                      required
+                      className="form-input"
+                      value={presetName}
+                      onChange={(e) => setPresetName(e.target.value)}
+                      placeholder="e.g., Lotus (BJP) Logo"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Category</label>
+                    <select
+                      className="form-input"
+                      value={presetCategory}
+                      onChange={(e) => setPresetCategory(e.target.value)}
+                    >
+                      <option value="political">Political Assets</option>
+                      <option value="ribbons">Bottom Ribbons</option>
+                      <option value="nameplates">Name Plates</option>
+                      <option value="stickers">Stickers</option>
+                      <option value="borders">Borders</option>
+                      <option value="decorative">Decorative Elements</option>
+                      <option value="birthday">Birthday Assets</option>
+                      <option value="wedding">Wedding Assets</option>
+                      <option value="business">Business Assets</option>
+                      <option value="social">Social Media Elements</option>
+                      <option value="festival">Festival Assets</option>
+                      <option value="badges">Badges</option>
+                      <option value="labels">Labels</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Tags (Optional, comma-separated)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={presetTags}
+                      onChange={(e) => setPresetTags(e.target.value)}
+                      placeholder="e.g., banner, bjp, election, orange"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Preset Status</label>
+                    <select
+                      className="form-input"
+                      value={presetEnabled ? 'true' : 'false'}
+                      onChange={(e) => setPresetEnabled(e.target.value === 'true')}
+                    >
+                      <option value="true">Enabled</option>
+                      <option value="false">Disabled</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Preset Asset File (SVG, PNG, JPG, GIF)</label>
+                    <input
+                      id="preset-file-input"
+                      type="file"
+                      className="form-input"
+                      accept="image/*"
+                      required={!presetId}
+                      onChange={(e) => setPresetFile(e.target.files[0])}
+                    />
+                  </div>
+
+                  <div className="form-actions-row">
+                    <button type="submit" disabled={saving} className="btn btn-primary flex-grow">
+                      {saving ? 'Saving...' : 'Save Preset'}
+                    </button>
+                    {presetId && (
+                      <button type="button" onClick={resetPresetForm} className="btn btn-secondary">
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </form>
+
+                {/* Presets Table */}
+                <div className="admin-table-wrapper glass-card">
+                  <h2>Uploaded Presets ({presets.length})</h2>
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Preview</th>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {presets.map((preset) => (
+                        <tr key={preset._id}>
+                          <td>
+                            <div style={{
+                              width: '40px',
+                              height: '40px',
+                              background: 'rgba(255,255,255,0.05)',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              overflow: 'hidden',
+                              border: '1px solid rgba(255,255,255,0.1)'
+                            }}>
+                              <img
+                                src={preset.url}
+                                alt={preset.name}
+                                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                              />
+                            </div>
+                          </td>
+                          <td>
+                            <strong>{preset.name}</strong>
+                            {preset.tags && preset.tags.length > 0 && (
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                {preset.tags.map((t, i) => (
+                                  <span key={i} style={{
+                                    fontSize: '0.65rem',
+                                    background: 'rgba(255,255,255,0.08)',
+                                    padding: '2px 6px',
+                                    borderRadius: '10px',
+                                    color: 'rgba(255,255,255,0.6)'
+                                  }}>
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ textTransform: 'capitalize' }}>{preset.category}</td>
+                          <td>
+                            <span className={`status-badge ${preset.enabled ? 'active' : 'inactive'}`} style={{
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              background: preset.enabled ? 'rgba(46, 125, 50, 0.2)' : 'rgba(198, 40, 40, 0.2)',
+                              color: preset.enabled ? '#81c784' : '#e57373',
+                              border: preset.enabled ? '1px solid rgba(46, 125, 50, 0.3)' : '1px solid rgba(198, 40, 40, 0.3)'
+                            }}>
+                              {preset.enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="table-actions-row">
+                              <button onClick={() => handleEditPreset(preset)} className="btn btn-secondary btn-xs">Edit</button>
+                              <button onClick={() => handleDeletePreset(preset._id)} className="btn btn-danger btn-xs">Delete</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {presets.length === 0 && (
+                        <tr>
+                          <td colSpan="5" style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', padding: '20px' }}>
+                            No dynamic presets uploaded yet.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

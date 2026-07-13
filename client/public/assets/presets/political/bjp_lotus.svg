@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="lotusGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff9933" />
+      <stop offset="100%" stop-color="#ff3366" />
+    </linearGradient>
+  </defs>
+  <path d="M50 15 C45 35, 30 40, 20 45 C30 50, 45 45, 50 65 C55 45, 70 50, 80 45 C70 40, 55 35, 50 15 Z" fill="url(#lotusGrad)" />
+  <path d="M50 30 C45 45, 35 48, 28 50 C38 52, 45 48, 50 65 C55 48, 62 52, 72 50 C65 48, 55 45, 50 30 Z" fill="#ffffff" opacity="0.9" />
+  <path d="M50 65 C40 68, 30 65, 15 72 C30 75, 45 72, 50 82 C55 72, 70 75, 85 72 C70 65, 60 68, 50 65 Z" fill="#009933" />
+  <path d="M50 82 L50 92 L53 92 L53 82 Z" fill="#7a5230" />
+</svg>
