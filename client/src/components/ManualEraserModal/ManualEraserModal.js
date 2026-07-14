@@ -299,6 +299,7 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
   //  Pointer event handlers (unified mouse + touch)
   // ============================================================
   const handlePointerDown = useCallback((e) => {
+    console.log('[PointerDown] pointerId:', e.pointerId, 'pointerType:', e.pointerType, 'clientX:', e.clientX, 'clientY:', e.clientY);
     const pointers = activePointersRef.current;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -320,6 +321,12 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
 
     // Single finger/click → draw
     if (pointers.size === 1) {
+      try {
+        e.target.setPointerCapture(e.pointerId);
+        console.log('[PointerCapture] set pointer capture success for ID:', e.pointerId);
+      } catch (err) {
+        console.warn('[PointerCapture] setPointerCapture failed:', err);
+      }
       isDrawingRef.current = true;
       const imgPos = screenToImage(e.clientX, e.clientY);
       lastPosRef.current = imgPos;
@@ -346,6 +353,7 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
   }, [zoom, panOffset, screenToImage, edgeDetection, tool, paintAt]);
 
   const handlePointerMove = useCallback((e) => {
+    console.log('[PointerMove] pointerId:', e.pointerId, 'pointerType:', e.pointerType, 'clientX:', e.clientX, 'clientY:', e.clientY);
     e.preventDefault();
     const pointers = activePointersRef.current;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -390,8 +398,131 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
   }, [brushSize, zoom, screenToImage, paintLine]);
 
   const handlePointerUp = useCallback((e) => {
+    console.log(`[${e.type.toUpperCase()}] pointerId:`, e.pointerId, 'pointerType:', e.pointerType);
+    try {
+      if (e.target.hasPointerCapture(e.pointerId)) {
+        e.target.releasePointerCapture(e.pointerId);
+        console.log('[PointerCapture] released pointer capture success for ID:', e.pointerId);
+      }
+    } catch (err) {
+      console.warn('[PointerCapture] releasePointerCapture failed:', err);
+    }
     const pointers = activePointersRef.current;
     pointers.delete(e.pointerId);
+
+    if (pointers.size === 0) {
+      if (isDrawingRef.current) {
+        pushHistory();
+        isDrawingRef.current = false;
+      }
+      isPanningRef.current = false;
+      panStartRef.current = null;
+      pinchBaseRef.current = null;
+      lastPosRef.current = null;
+      sampledColorRef.current = null;
+    }
+  }, [pushHistory]);
+
+  // ============================================================
+  //  Touch event fallback handlers (highly reliable on Android)
+  // ============================================================
+  const handleTouchStart = useCallback((e) => {
+    e.preventDefault(); // Prevents native scroll/zoom gestures and synthetic mouse/pointer events
+    console.log('[TouchStart] touches count:', e.touches.length);
+    const pointers = activePointersRef.current;
+    
+    // Clear and sync touches
+    pointers.clear();
+    for (let i = 0; i < e.touches.length; i++) {
+      const touch = e.touches[i];
+      pointers.set(touch.identifier, { x: touch.clientX, y: touch.clientY });
+    }
+
+    // Two-finger → pan/pinch
+    if (e.touches.length === 2) {
+      isDrawingRef.current = false;
+      const pts = Array.from(pointers.values());
+      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      pinchBaseRef.current = { dist, zoom, panOffset: { ...panOffset } };
+      return;
+    }
+
+    // Single touch → draw
+    if (e.touches.length === 1) {
+      isDrawingRef.current = true;
+      const touch = e.touches[0];
+      const imgPos = screenToImage(touch.clientX, touch.clientY);
+      lastPosRef.current = imgPos;
+
+      // Sample color for edge detection
+      if (edgeDetection && tool === 'eraser') {
+        const orig = originalDataRef.current;
+        if (orig) {
+          const px = Math.round(imgPos.x);
+          const py = Math.round(imgPos.y);
+          if (px >= 0 && px < orig.width && py >= 0 && py < orig.height) {
+            const idx = (py * orig.width + px) * 4;
+            sampledColorRef.current = {
+              r: orig.data[idx],
+              g: orig.data[idx + 1],
+              b: orig.data[idx + 2]
+            };
+          }
+        }
+      }
+
+      paintAt(imgPos.x, imgPos.y);
+    }
+  }, [zoom, panOffset, screenToImage, edgeDetection, tool, paintAt]);
+
+  const handleTouchMove = useCallback((e) => {
+    e.preventDefault(); // Prevents scroll/zoom and matching pointer/mouse events
+    console.log('[TouchMove] touches count:', e.touches.length);
+    const pointers = activePointersRef.current;
+    for (let i = 0; i < e.touches.length; i++) {
+      const touch = e.touches[i];
+      pointers.set(touch.identifier, { x: touch.clientX, y: touch.clientY });
+    }
+
+    // Update cursor preview
+    if (cursorRef.current && e.touches.length === 1) {
+      const touch = e.touches[0];
+      const size = brushSize * zoom;
+      cursorRef.current.style.left = `${touch.clientX - size / 2}px`;
+      cursorRef.current.style.top = `${touch.clientY - size / 2}px`;
+      cursorRef.current.style.width = `${size}px`;
+      cursorRef.current.style.height = `${size}px`;
+      cursorRef.current.style.display = 'block';
+    }
+
+    // Two-finger pinch/pan zoom
+    if (e.touches.length === 2 && pinchBaseRef.current) {
+      const pts = Array.from(pointers.values());
+      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      const scale = dist / pinchBaseRef.current.dist;
+      const newZoom = Math.max(0.1, Math.min(10, pinchBaseRef.current.zoom * scale));
+      setZoom(newZoom);
+      return;
+    }
+
+    // Drawing
+    if (isDrawingRef.current && e.touches.length === 1) {
+      const touch = e.touches[0];
+      const imgPos = screenToImage(touch.clientX, touch.clientY);
+      if (lastPosRef.current) {
+        paintLine(lastPosRef.current, imgPos);
+      }
+      lastPosRef.current = imgPos;
+    }
+  }, [brushSize, zoom, screenToImage, paintLine]);
+
+  const handleTouchEnd = useCallback((e) => {
+    console.log('[TouchEnd/Cancel] changedTouches count:', e.changedTouches.length);
+    const pointers = activePointersRef.current;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      pointers.delete(touch.identifier);
+    }
 
     if (pointers.size === 0) {
       if (isDrawingRef.current) {
@@ -566,6 +697,10 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerLeave}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         onWheel={handleWheel}
       >
         <canvas
