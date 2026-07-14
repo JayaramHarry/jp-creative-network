@@ -1965,11 +1965,13 @@ export default function TemplateDetail() {
     const src = layer.originalUrl || layer.url;
     if (!src) return null;
 
+    const isMobile = window.innerWidth <= 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    const MAX_SIZE = isMobile ? 1280 : 1920;
+
     // Fast-path: if imageObj is already complete and dimensions are within limits, skip downscaling
     if (layer.imageObj && layer.imageObj.complete && layer.imageObj.naturalWidth) {
       const width = layer.imageObj.naturalWidth;
       const height = layer.imageObj.naturalHeight;
-      const MAX_SIZE = 1920;
       if (width <= MAX_SIZE && height <= MAX_SIZE) {
         return null;
       }
@@ -1984,7 +1986,6 @@ export default function TemplateDetail() {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
-        const MAX_SIZE = 1920;
         let { width, height } = img;
 
         if (width <= MAX_SIZE && height <= MAX_SIZE) {

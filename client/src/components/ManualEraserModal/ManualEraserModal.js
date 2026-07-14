@@ -38,6 +38,7 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
   const isPanningRef = useRef(false);
   const panStartRef = useRef(null);
   const spaceDownRef = useRef(false);
+  const allocationsRef = useRef({ imageData: 0, canvas: 0 });
 
   // ============================================================
   //  Initialization — load image into canvases
@@ -70,6 +71,7 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
+      allocationsRef.current = { imageData: 2, canvas: 2 };
       originalImageRef.current = img;
 
       // Main canvas
@@ -140,9 +142,14 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
     ctx.drawImage(img, 0, 0);
 
     // Apply mask as alpha: where mask is black → transparent
+    allocationsRef.current.imageData += 2;
     const imgData = ctx.getImageData(0, 0, w, h);
     const maskCtx = mask.getContext('2d');
     const maskData = maskCtx.getImageData(0, 0, w, h);
+    
+    // Performance metrics log
+    console.log(`[Performance Log] renderComposite dimensions: ${w}x${h} | Undo history length: ${historyRef.current.length} | ImageData allocations: ${allocationsRef.current.imageData} | Canvas allocations: ${allocationsRef.current.canvas}`);
+
     const pixels = imgData.data;
     const mPixels = maskData.data;
 
@@ -160,11 +167,17 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
     const mask = maskCanvasRef.current;
     if (!mask) return;
     const maskCtx = mask.getContext('2d');
+    allocationsRef.current.imageData += 1;
     const snapshot = maskCtx.getImageData(0, 0, mask.width, mask.height);
     historyRef.current.push(snapshot);
     redoStackRef.current = [];
-    // Limit to 30 snapshots
-    if (historyRef.current.length > 30) historyRef.current.shift();
+    
+    // Adaptive history state limit (15 on desktop, 5 on mobile/tablet)
+    const isMobile = window.innerWidth <= 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    const historyLimit = isMobile ? 5 : 15;
+    if (historyRef.current.length > historyLimit) {
+      historyRef.current.shift();
+    }
   }, []);
 
   const undo = useCallback(() => {
@@ -229,6 +242,7 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
     if (edgeDetection && isEraser && sampledColorRef.current) {
       // --- Edge-aware erasing ---
       const orig = originalDataRef.current;
+      allocationsRef.current.imageData += 1;
       const maskData = maskCtx.getImageData(0, 0, mask.width, mask.height);
       const mp = maskData.data;
       const op = orig.data;
@@ -299,23 +313,85 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
       maskCtx.fill();
       maskCtx.restore();
     }
-
-    renderComposite();
-  }, [tool, brushSize, brushHardness, edgeDetection, colorTolerance, renderComposite]);
+  }, [tool, brushSize, brushHardness, edgeDetection, colorTolerance]);
 
   // Interpolate between two points for smooth strokes
   const paintLine = useCallback((from, to) => {
+    const mask = maskCanvasRef.current;
+    const img = originalImageRef.current;
+    if (!mask || !img) return;
+
+    const maskCtx = mask.getContext('2d');
+    const radius = brushSize / 2;
+    const hardness = brushHardness / 100;
+    const isEraser = tool === 'eraser';
+
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     const step = Math.max(1, brushSize / 6);
     const steps = Math.ceil(dist / step);
 
-    for (let i = 0; i <= steps; i++) {
-      const t = steps === 0 ? 0 : i / steps;
-      paintAt(from.x + dx * t, from.y + dy * t);
+    if (edgeDetection && isEraser && sampledColorRef.current) {
+      // Optimized Edge-Aware Drawing: Allocate maskData ONCE for the entire line stroke segment
+      const orig = originalDataRef.current;
+      allocationsRef.current.imageData += 1;
+      const maskData = maskCtx.getImageData(0, 0, mask.width, mask.height);
+      const mp = maskData.data;
+      const op = orig.data;
+      const tgt = sampledColorRef.current;
+      const tol = colorTolerance;
+
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        const imgX = from.x + dx * t;
+        const imgY = from.y + dy * t;
+
+        const x0 = Math.max(0, Math.floor(imgX - radius));
+        const y0 = Math.max(0, Math.floor(imgY - radius));
+        const x1 = Math.min(mask.width - 1, Math.ceil(imgX + radius));
+        const y1 = Math.min(mask.height - 1, Math.ceil(imgY + radius));
+
+        for (let py = y0; py <= y1; py++) {
+          for (let px = x0; px <= x1; px++) {
+            const ldx = px - imgX;
+            const ldy = py - imgY;
+            const ldist = Math.sqrt(ldx * ldx + ldy * ldy);
+            if (ldist > radius) continue;
+
+            let strength = 1;
+            if (hardness < 1) {
+              const featherStart = radius * hardness;
+              if (ldist > featherStart) {
+                strength = 1 - (ldist - featherStart) / (radius - featherStart);
+              }
+            }
+
+            const idx = (py * mask.width + px) * 4;
+            const dr = op[idx] - tgt.r;
+            const dg = op[idx + 1] - tgt.g;
+            const db = op[idx + 2] - tgt.b;
+            const colorDist = Math.sqrt(dr * dr + dg * dg + db * db);
+
+            if (colorDist <= tol) {
+              const newVal = Math.max(0, mp[idx] - Math.round(255 * strength));
+              mp[idx] = mp[idx + 1] = mp[idx + 2] = newVal;
+            }
+          }
+        }
+      }
+      maskCtx.putImageData(maskData, 0, 0);
+    } else {
+      // Standard drawing logic
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        paintAt(from.x + dx * t, from.y + dy * t);
+      }
     }
-  }, [paintAt, brushSize]);
+    
+    // Trigger composite rendering ONCE at the end of the entire pointer/touch movement frame
+    renderComposite();
+  }, [paintAt, brushSize, brushHardness, tool, edgeDetection, colorTolerance, renderComposite]);
 
   // ============================================================
   //  Pointer event handlers (unified mouse + touch)
@@ -371,8 +447,9 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
       }
 
       paintAt(imgPos.x, imgPos.y);
+      renderComposite();
     }
-  }, [zoom, panOffset, screenToImage, edgeDetection, tool, paintAt]);
+  }, [zoom, panOffset, screenToImage, edgeDetection, tool, paintAt, renderComposite]);
 
   const handlePointerMove = useCallback((e) => {
     console.log('[PointerMove] pointerId:', e.pointerId, 'pointerType:', e.pointerType, 'clientX:', e.clientX, 'clientY:', e.clientY);
@@ -494,8 +571,9 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
       }
 
       paintAt(imgPos.x, imgPos.y);
+      renderComposite();
     }
-  }, [zoom, panOffset, screenToImage, edgeDetection, tool, paintAt]);
+  }, [zoom, panOffset, screenToImage, edgeDetection, tool, paintAt, renderComposite]);
 
   const handleTouchMove = useCallback((e) => {
     e.preventDefault(); // Prevents scroll/zoom and matching pointer/mouse events
@@ -539,6 +617,7 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
   }, [brushSize, zoom, screenToImage, paintLine]);
 
   const handleTouchEnd = useCallback((e) => {
+    e.preventDefault();
     console.log('[TouchEnd/Cancel] changedTouches count:', e.changedTouches.length);
     const pointers = activePointersRef.current;
     for (let i = 0; i < e.changedTouches.length; i++) {
