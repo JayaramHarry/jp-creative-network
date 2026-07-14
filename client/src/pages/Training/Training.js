@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { getWhatsAppLink } from '../../services/whatsappHelper.js';
 import './Training.css';
 
 export default function Training() {
@@ -79,7 +80,14 @@ export default function Training() {
               <strong>Please Note:</strong> This is a potential opportunity based on skills and project availability, not a guaranteed job placement. We prioritize students who show dedication and deliver outstanding work.
             </div>
             <div className="wfh-cta-row">
-              <Link to="/contact?subject=Academy Inquiry" className="btn btn-primary wfh-btn">Inquire About Training</Link>
+              <a 
+                href={getWhatsAppLink('Video Editing Academy Training')}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-primary wfh-btn"
+              >
+                Inquire About Training
+              </a>
             </div>
           </div>
         </div>

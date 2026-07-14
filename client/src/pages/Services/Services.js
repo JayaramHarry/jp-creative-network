@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import API from '../../services/api.js';
 import { AuthContext } from '../../context/AuthContext.js';
+import { getWhatsAppLink } from '../../services/whatsappHelper.js';
 import './Services.css';
 
 const getServiceBackgroundImage = (title) => {
@@ -45,27 +46,6 @@ export default function Services() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Modal Inquiry state
-  const [activeService, setActiveService] = useState(null);
-  const [inquiryName, setInquiryName] = useState('');
-  const [inquiryEmail, setInquiryEmail] = useState('');
-  const [inquiryPhone, setInquiryPhone] = useState('');
-  const [requirements, setRequirements] = useState('');
-  const [referenceFile, setReferenceFile] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState('');
-
-  // Prefill details if user changes/logs in
-  useEffect(() => {
-    if (user) {
-      setInquiryName(user.name || '');
-      setInquiryEmail(user.email || '');
-    } else {
-      setInquiryName('');
-      setInquiryEmail('');
-    }
-  }, [user]);
-
   // Load Services
   useEffect(() => {
     const fetchServices = async () => {
@@ -107,57 +87,6 @@ export default function Services() {
     };
     fetchServices();
   }, []);
-
-  const openInquiryModal = (service) => {
-    setActiveService(service);
-    setRequirements(`Hi, I am interested in your "${service.title}" service. Please share details on timelines and customizable layouts. \n\nAdditional requirements: `);
-    setInquiryPhone('');
-    setReferenceFile(null);
-    setSuccessMsg('');
-  };
-
-  const closeInquiryModal = () => {
-    setActiveService(null);
-  };
-
-  const handleSubmitInquiry = async (e) => {
-    e.preventDefault();
-    if (!inquiryName || !inquiryEmail || !requirements) {
-      alert('Please fill out all required fields.');
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      
-      const formData = new FormData();
-      formData.append('name', inquiryName);
-      formData.append('email', inquiryEmail);
-      formData.append('phone', inquiryPhone);
-      formData.append('requirementsDescription', requirements);
-      
-      if (referenceFile) {
-        formData.append('reference', referenceFile);
-      }
-
-      const { data } = await API.post('/contact/custom-design', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      if (data.success) {
-        setSuccessMsg('Your custom design request has been submitted successfully! Our design desk will contact you shortly.');
-        setInquiryPhone('');
-        setReferenceFile(null);
-      }
-    } catch (err) {
-      console.error('Error submitting service inquiry:', err);
-      alert(err.response?.data?.message || 'Failed to submit request.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -224,12 +153,15 @@ export default function Services() {
               
               <div className="service-footer-row">
                 <span className="service-price-tag-value">{service.price || 'Contact for price'}</span>
-                <button 
-                  onClick={() => openInquiryModal(service)}
+                <a 
+                  href={getWhatsAppLink(service.title)}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="btn btn-primary btn-sm service-inquire-btn"
+                  style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
                 >
                   {service.isCustomSong ? 'Order Now' : 'Inquire Now'}
-                </button>
+                </a>
               </div>
             </div>
 
@@ -237,93 +169,6 @@ export default function Services() {
         );
       })}
       </div>
-
-      {/* Inquiry Modal Overlay */}
-      {activeService && (
-        <div className="modal-backdrop-overlay">
-          <div className="modal-dialog-content glass-card fade-in-up">
-            <button className="modal-close-btn" onClick={closeInquiryModal}>&times;</button>
-            
-            <h2>Service Inquiry</h2>
-            <p className="modal-subtitle">You are inquiring about: <strong>{activeService.title}</strong></p>
-
-            {successMsg ? (
-              <div className="modal-success-pane">
-                <div className="success-checkmark-circle">
-                  <span className="success-checkmark"></span>
-                </div>
-                <p className="success-alert-txt">{successMsg}</p>
-                <button className="btn btn-secondary w-full" onClick={closeInquiryModal}>
-                  Close Window
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmitInquiry} className="modal-inquiry-form">
-                <div className="form-group">
-                  <label className="form-label">Full Name *</label>
-                  <input
-                    type="text"
-                    required
-                    className="form-input"
-                    value={inquiryName}
-                    onChange={(e) => setInquiryName(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Email Address *</label>
-                  <input
-                    type="email"
-                    required
-                    className="form-input"
-                    value={inquiryEmail}
-                    onChange={(e) => setInquiryEmail(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Phone Number (Optional)</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Enter phone number..."
-                    value={inquiryPhone}
-                    onChange={(e) => setInquiryPhone(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Detailed Requirements *</label>
-                  <textarea
-                    required
-                    rows="4"
-                    className="form-input textarea-control"
-                    value={requirements}
-                    onChange={(e) => setRequirements(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Upload Reference Design / PDF (Optional)</label>
-                  <input
-                    type="file"
-                    className="form-input file-input-control"
-                    onChange={(e) => setReferenceFile(e.target.files[0])}
-                  />
-                </div>
-
-                <button 
-                  type="submit" 
-                  disabled={submitting}
-                  className="btn btn-primary w-full submit-inquiry-btn"
-                >
-                  {submitting ? 'Submitting request...' : 'Send Inquiry Request'}
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

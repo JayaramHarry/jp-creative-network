@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import API from '../../services/api.js';
+import { getWhatsAppLink } from '../../services/whatsappHelper.js';
 import './Home.css';
 
 const HERO_SLIDES = [
@@ -115,9 +116,14 @@ export default function Home() {
                 <Link to={slide.ctaLink} className="btn btn-primary">
                   {slide.ctaText}
                 </Link>
-                <Link to="/contact" className="btn btn-secondary">
+                <a 
+                  href={getWhatsAppLink('Custom Design Request')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-secondary"
+                >
                   Custom Request
-                </Link>
+                </a>
               </div>
             </div>
           </div>
@@ -224,7 +230,14 @@ export default function Home() {
               <h3>{serv.title}</h3>
               <p>{serv.description}</p>
               <span className="service-price">{serv.price}</span>
-              <Link to="/contact" className="service-link">Inquire Now →</Link>
+              <a 
+                href={getWhatsAppLink(serv.title)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="service-link"
+              >
+                Inquire Now →
+              </a>
             </div>
           ))}
         </div>

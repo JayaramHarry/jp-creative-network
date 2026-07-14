@@ -1,4 +1,5 @@
 import Preset from '../models/Preset.js';
+import { uploadPresetAsset, deletePresetAsset } from '../services/presetStorageService.js';
 
 export const getPresets = async (req, res) => {
   try {
@@ -20,7 +21,7 @@ export const createPreset = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please upload a preset asset file' });
     }
 
-    const url = `/uploads/${req.file.filename}`;
+    const url = await uploadPresetAsset(req.file);
     
     let parsedTags = [];
     if (tags) {
@@ -60,7 +61,10 @@ export const updatePreset = async (req, res) => {
     }
 
     if (req.file) {
-      preset.url = `/uploads/${req.file.filename}`;
+      if (preset.url) {
+        await deletePresetAsset(preset.url);
+      }
+      preset.url = await uploadPresetAsset(req.file);
     }
 
     await preset.save();
@@ -78,6 +82,9 @@ export const deletePreset = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Preset not found' });
     }
 
+    if (preset.url) {
+      await deletePresetAsset(preset.url);
+    }
     await preset.deleteOne();
     res.json({ success: true, message: 'Preset deleted successfully' });
   } catch (error) {

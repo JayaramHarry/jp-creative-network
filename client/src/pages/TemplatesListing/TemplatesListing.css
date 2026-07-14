@@ -183,9 +183,7 @@
   transition: var(--transition-smooth);
 }
 
-.template-card:hover .template-image {
-  transform: scale(1.03);
-}
+/* Image scale hover removed to prevent pointer issues */
 
 .template-badge {
   position: absolute;

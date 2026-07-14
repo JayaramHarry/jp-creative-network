@@ -205,9 +205,7 @@
   transition: var(--transition-smooth);
 }
 
-.category-card:hover .category-image {
-  transform: scale(1.05);
-}
+/* Category image zoom hover removed to prevent click issues */
 
 .category-info {
   padding: 24px;
@@ -432,10 +430,11 @@
   transition: var(--transition-smooth);
 }
 
-.core-service-highlight:hover {
-  transform: translateY(-5px);
-  border-color: var(--primary);
-  box-shadow: 0 10px 30px rgba(99, 102, 241, 0.15);
+@media (hover: hover) {
+  .core-service-highlight:hover {
+    border-color: var(--primary);
+    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.15);
+  }
 }
 
 .core-icon {
@@ -505,48 +504,53 @@
 }
 
 /* Hover States */
-.follow-card:hover {
-  transform: translateY(-5px);
+@media (hover: hover) {
+  .follow-card:hover {
+    /* Stabilized position to prevent click interception */
+  }
+
+  .follow-card:hover .follow-icon {
+    /* Stabilized scale */
+  }
+
+  .follow-card:hover .follow-info {
+    opacity: 1;
+    max-height: 80px;
+  }
+
+  .follow-card.poster-ig:hover {
+    border-color: #e6683c;
+    box-shadow: 0 10px 30px rgba(230, 104, 60, 0.25);
+  }
+
+  .follow-card.ai-ig:hover {
+    border-color: #fd1d1d;
+    box-shadow: 0 10px 30px rgba(253, 29, 29, 0.25);
+  }
+
+  .follow-card.reels-ig:hover {
+    border-color: #833ab4;
+    box-shadow: 0 10px 30px rgba(131, 58, 180, 0.25);
+  }
+
+  .follow-card.youtube-card:hover {
+    border-color: #ff0000;
+    box-shadow: 0 10px 30px rgba(255, 0, 0, 0.25);
+  }
 }
 
-.follow-card:hover .follow-icon {
-  transform: scale(1.15);
-}
-
-.follow-card:hover .follow-info {
-  opacity: 1;
-  max-height: 80px;
-  transform: translateY(0);
-}
-
-.follow-card.poster-ig:hover {
-  border-color: #e6683c;
-  box-shadow: 0 10px 30px rgba(230, 104, 60, 0.25);
-}
 .follow-card.poster-ig .follow-handle {
   color: #e6683c;
 }
 
-.follow-card.ai-ig:hover {
-  border-color: #fd1d1d;
-  box-shadow: 0 10px 30px rgba(253, 29, 29, 0.25);
-}
 .follow-card.ai-ig .follow-handle {
   color: #fd1d1d;
 }
 
-.follow-card.reels-ig:hover {
-  border-color: #833ab4;
-  box-shadow: 0 10px 30px rgba(131, 58, 180, 0.25);
-}
 .follow-card.reels-ig .follow-handle {
   color: #833ab4;
 }
 
-.follow-card.youtube-card:hover {
-  border-color: #ff0000;
-  box-shadow: 0 10px 30px rgba(255, 0, 0, 0.25);
-}
 .follow-card.youtube-card .follow-handle {
   color: #ff0000;
 }

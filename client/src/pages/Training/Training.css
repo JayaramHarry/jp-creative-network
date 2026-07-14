@@ -152,11 +152,12 @@
   z-index: 1;
 }
 
-.wfh-highlight-card:hover {
-  border-color: rgba(139, 92, 246, 0.55) !important;
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75), 
-              0 0 20px rgba(139, 92, 246, 0.35) !important;
-  transform: translateY(-8px) scale(1.02);
+@media (hover: hover) {
+  .wfh-highlight-card:hover {
+    border-color: rgba(139, 92, 246, 0.55) !important;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75), 
+                0 0 20px rgba(139, 92, 246, 0.35) !important;
+  }
 }
 
 .wfh-header {
@@ -261,11 +262,12 @@
   transition: var(--transition-smooth);
 }
 
-.benefit-badge:hover {
-  background: var(--primary-light);
-  border-color: rgba(99, 102, 241, 0.35);
-  color: #ffffff;
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .benefit-badge:hover {
+    background: var(--primary-light);
+    border-color: rgba(99, 102, 241, 0.35);
+    color: #ffffff;
+  }
 }
 
 /* Academy Section Responsive Styles */

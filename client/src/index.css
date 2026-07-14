@@ -111,12 +111,13 @@ button, input, textarea, select {
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.glass-card:hover {
-  border-color: rgba(99, 102, 241, 0.5); /* Glowing accent border on hover */
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75), 
-              0 0 20px rgba(99, 102, 241, 0.35); /* Distinct primary glow outline */
-  background: rgba(38, 51, 74, 0.98);
-  transform: translateY(-8px) scale(1.02); /* Smooth lift and scale combo */
+@media (hover: hover) {
+  .glass-card:hover {
+    border-color: rgba(99, 102, 241, 0.5); /* Glowing accent border on hover */
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75), 
+                0 0 20px rgba(99, 102, 241, 0.35); /* Distinct primary glow outline */
+    background: rgba(38, 51, 74, 0.98);
+  }
 }
 
 /* Card Text Readability Helpers */
@@ -191,21 +192,10 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
 }
 
-.btn-primary:hover {
-  transform: scale(1.02);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
-  filter: brightness(1.1);
-}
-
 .btn-secondary {
   background: var(--bg-input);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
-}
-
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .btn-danger {
@@ -213,8 +203,20 @@ h1, h2, h3, h4, h5, h6 {
   color: #fff;
 }
 
-.btn-danger:hover {
-  filter: brightness(1.1);
+@media (hover: hover) {
+  .btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+    filter: brightness(1.1);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .btn-danger:hover {
+    filter: brightness(1.1);
+  }
 }
 
 /* Common form style elements */
