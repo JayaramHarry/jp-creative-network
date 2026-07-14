@@ -43,7 +43,29 @@ export default function ManualEraserModal({ isOpen, imageUrl, onApply, onCancel 
   //  Initialization — load image into canvases
   // ============================================================
   useEffect(() => {
-    if (!isOpen || !imageUrl) return;
+    if (!isOpen) {
+      // Clear memory references and history stack immediately when closed
+      historyRef.current = [];
+      redoStackRef.current = [];
+      originalImageRef.current = null;
+      originalDataRef.current = null;
+      if (maskCanvasRef.current) {
+        maskCanvasRef.current.width = 0;
+        maskCanvasRef.current.height = 0;
+      }
+      maskCanvasRef.current = null;
+      sampledColorRef.current = null;
+      activePointersRef.current.clear();
+      
+      // Clear main canvas references
+      if (canvasRef.current) {
+        canvasRef.current.width = 0;
+        canvasRef.current.height = 0;
+      }
+      return;
+    }
+
+    if (!imageUrl) return;
 
     const img = new Image();
     img.crossOrigin = 'anonymous';

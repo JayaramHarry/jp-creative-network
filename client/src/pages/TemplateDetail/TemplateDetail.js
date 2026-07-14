@@ -53,6 +53,7 @@ export default function TemplateDetail() {
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [bgRemovalError, setBgRemovalError] = useState(null);
   const [isEraserModalOpen, setIsEraserModalOpen] = useState(false);
+  const [isPreprocessingImage, setIsPreprocessingImage] = useState(false);
   const [contextMenu, setContextMenu] = useState(null); // { x, y, layerId }
 
   // Presets Library Search and Filter States
@@ -97,6 +98,7 @@ export default function TemplateDetail() {
   const mobileTextInputRef = useRef(null);
   const canvasMobileTextInputRef = useRef(null);
   const lastTapRef = useRef({ time: 0, layerId: null });
+  const createdObjectUrlsRef = useRef([]);
 
   const focusCanvasMobileTextInput = () => {
     if (canvasMobileTextInputRef.current) {
@@ -109,6 +111,20 @@ export default function TemplateDetail() {
   useEffect(() => {
     currentTimeRef.current = currentTime;
   }, [currentTime]);
+
+  // Cleanup object URLs on unmount
+  useEffect(() => {
+    return () => {
+      createdObjectUrlsRef.current.forEach(url => {
+        try {
+          URL.revokeObjectURL(url);
+          console.log('[Cleanup] Revoked object URL on unmount:', url);
+        } catch (e) {
+          console.warn('Failed to revoke URL on unmount:', url, e);
+        }
+      });
+    };
+  }, []);
 
   // Always keep layersRef in sync with the latest layers state
   useEffect(() => {
@@ -1945,8 +1961,138 @@ export default function TemplateDetail() {
     }
   };
 
-  const openCropModal = () => {
+  const preprocessLayerImage = async (layer) => {
+    const src = layer.originalUrl || layer.url;
+    if (!src) return null;
+
+    // Fast-path: if imageObj is already complete and dimensions are within limits, skip downscaling
+    if (layer.imageObj && layer.imageObj.complete && layer.imageObj.naturalWidth) {
+      const width = layer.imageObj.naturalWidth;
+      const height = layer.imageObj.naturalHeight;
+      const MAX_SIZE = 1920;
+      if (width <= MAX_SIZE && height <= MAX_SIZE) {
+        return null;
+      }
+    }
+
+    // Skip if it is already a local object URL we created in this session
+    if (src.startsWith('blob:') && createdObjectUrlsRef.current.includes(src)) {
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const MAX_SIZE = 1920;
+        let { width, height } = img;
+
+        if (width <= MAX_SIZE && height <= MAX_SIZE) {
+          resolve(null);
+          return;
+        }
+
+        // Calculate aspect ratio-preserving dimensions
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+
+        console.log(`[Downscale] Resizing high-res image from ${img.width}x${img.height} to ${width}x${height} for performance.`);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          ctx.clearRect(0, 0, width, height);
+          canvas.width = 0;
+          canvas.height = 0;
+
+          if (!blob) {
+            resolve(null);
+            return;
+          }
+          
+          const objectUrl = URL.createObjectURL(blob);
+          const resizedImg = new Image();
+          resizedImg.crossOrigin = 'anonymous';
+          resizedImg.onload = () => {
+            resolve({
+              url: objectUrl,
+              originalUrl: objectUrl,
+              imageObj: resizedImg
+            });
+          };
+          resizedImg.onerror = () => {
+            resolve(null);
+          };
+          resizedImg.src = objectUrl;
+        }, 'image/png');
+      };
+      img.onerror = () => {
+        resolve(null);
+      };
+      img.src = src;
+    });
+  };
+
+  const cleanupResizedImages = () => {
+    createdObjectUrlsRef.current.forEach(url => {
+      try {
+        URL.revokeObjectURL(url);
+        console.log('[Cleanup] Revoked object URL:', url);
+      } catch (err) {
+        console.warn('Failed to revoke URL:', url, err);
+      }
+    });
+    createdObjectUrlsRef.current = [];
+  };
+
+  const openEraserModal = async () => {
     if (!activeLayer) return;
+    
+    setIsPreprocessingImage(true);
+    const processed = await preprocessLayerImage(activeLayer);
+    setIsPreprocessingImage(false);
+    
+    if (processed) {
+      createdObjectUrlsRef.current.push(processed.url);
+      updateLayerProperties(activeLayerId, {
+        url: processed.url,
+        originalUrl: processed.originalUrl,
+        imageObj: processed.imageObj
+      });
+    }
+    
+    setIsEraserModalOpen(true);
+  };
+
+  const openCropModal = async () => {
+    if (!activeLayer) return;
+    
+    setIsPreprocessingImage(true);
+    const processed = await preprocessLayerImage(activeLayer);
+    setIsPreprocessingImage(false);
+    
+    if (processed) {
+      createdObjectUrlsRef.current.push(processed.url);
+      updateLayerProperties(activeLayerId, {
+        url: processed.url,
+        originalUrl: processed.originalUrl,
+        imageObj: processed.imageObj
+      });
+    }
     
     setCropBgRemovalEnabled(false);
     setCropBgRemovalColor('#ffffff');
@@ -2207,6 +2353,10 @@ export default function TemplateDetail() {
       }
 
       const croppedBase64 = canvas.toDataURL('image/png');
+      
+      // Clear temporary canvas buffer memory immediately
+      canvas.width = 0;
+      canvas.height = 0;
 
       const croppedImg = new Image();
       croppedImg.src = croppedBase64;
@@ -2224,6 +2374,7 @@ export default function TemplateDetail() {
           cropAspectRatio
         });
         saveStateToHistory();
+        cleanupResizedImages();
       };
       setIsCropModalOpen(false);
     };
@@ -2253,11 +2404,29 @@ export default function TemplateDetail() {
     const timeoutId = setTimeout(() => controller.abort(), 45000);
 
     try {
+      setIsPreprocessingImage(true);
+      const processed = await preprocessLayerImage(activeLayer);
+      setIsPreprocessingImage(false);
+
+      let targetImageObj = activeLayer.imageObj;
+      let targetUrl = activeLayer.url;
+
+      if (processed) {
+        createdObjectUrlsRef.current.push(processed.url);
+        updateLayerProperties(activeLayerId, {
+          url: processed.url,
+          originalUrl: processed.originalUrl,
+          imageObj: processed.imageObj
+        });
+        targetImageObj = processed.imageObj;
+        targetUrl = processed.url;
+      }
+
       let base64Image = "";
-      if (activeLayer.url && activeLayer.url.startsWith('data:')) {
-        base64Image = activeLayer.url;
+      if (targetUrl && targetUrl.startsWith('data:')) {
+        base64Image = targetUrl;
       } else {
-        base64Image = getBase64FromImage(activeLayer.imageObj);
+        base64Image = getBase64FromImage(targetImageObj);
       }
 
       const { data } = await API.post(
@@ -2282,15 +2451,18 @@ export default function TemplateDetail() {
               bgRemovalTolerance: 40
             });
             saveStateToHistory();
+            cleanupResizedImages();
             setIsRemovingBg(false);
             resolve();
           };
           processedImg.onerror = () => {
+            cleanupResizedImages();
             reject(new Error("Failed to load processed AI cut-out image from response URL."));
           };
           processedImg.src = data.url;
         });
       } else {
+        cleanupResizedImages();
         throw new Error(data.message || "Backend AI segmentation failed.");
       }
     } catch (err) {
@@ -2924,7 +3096,7 @@ export default function TemplateDetail() {
                   <button 
                     type="button"
                     className="btn btn-secondary" 
-                    onClick={() => setIsEraserModalOpen(true)}
+                    onClick={openEraserModal}
                     style={{ 
                       flex: 1,
                       background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
@@ -4264,7 +4436,7 @@ export default function TemplateDetail() {
               <button onClick={handleResetCrop} className="btn btn-secondary" style={{ marginRight: 'auto' }}>
                 Reset Crop ↺
               </button>
-              <button onClick={() => setIsCropModalOpen(false)} className="btn btn-secondary">
+              <button onClick={() => { setIsCropModalOpen(false); cleanupResizedImages(); }} className="btn btn-secondary">
                 Cancel
               </button>
               <button onClick={handleApplyCrop} className="btn btn-primary">
@@ -4380,13 +4552,40 @@ export default function TemplateDetail() {
                 imageObj: processedImg
               });
               saveStateToHistory();
+              cleanupResizedImages();
             };
             processedImg.src = transparentDataUrl;
           }
           setIsEraserModalOpen(false);
         }}
-        onCancel={() => setIsEraserModalOpen(false)}
+        onCancel={() => {
+          setIsEraserModalOpen(false);
+          cleanupResizedImages();
+        }}
       />
+
+      {/* Optimization Preprocessing Loading Indicator */}
+      {isPreprocessingImage && (
+        <div className="preprocessing-loader" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(10, 12, 16, 0.85)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100000,
+          backdropFilter: 'blur(6px)'
+        }}>
+          <div className="loader" style={{ marginBottom: '15px' }} />
+          <div style={{ color: '#ffffff', fontSize: '0.95rem', fontWeight: '600', letterSpacing: '0.02em' }}>
+            Optimizing Image Bounds...
+          </div>
+        </div>
+      )}
     </div>
   );
 }
