@@ -47,7 +47,29 @@ const makeHttpRequest = (url, options, postData) => {
 
 const sendViaBrevo = async (to, subject, htmlContent) => {
   const senderEmail = process.env.EMAIL_USER || 'noreply@jpcreative.com';
-  const senderName = process.env.EMAIL_FROM ? process.env.EMAIL_FROM.split('<')[0].replace(/"/g, '').trim() : 'JP Creative NetWork';
+  let senderName = 'JP Creative NetWork';
+  if (process.env.EMAIL_FROM) {
+    const fromStr = process.env.EMAIL_FROM;
+    if (fromStr.includes('<')) {
+      senderName = fromStr.split('<')[0].replace(/"/g, '').trim();
+    } else {
+      senderName = fromStr.trim();
+    }
+  }
+
+  const maskEmail = (email) => {
+    if (!email) return 'N/A';
+    const parts = email.split('@');
+    if (parts.length !== 2) return '***';
+    const name = parts[0];
+    const domain = parts[1];
+    if (name.length <= 2) return `${name[0]}***@${domain}`;
+    return `${name[0]}${name[1]}***${name[name.length - 1]}@${domain}`;
+  };
+
+  console.log(`[Email Service] Brevo dispatch started.`);
+  console.log(`[Email Service] Sender email passed to Brevo API: ${maskEmail(senderEmail)}`);
+  console.log(`[Email Service] Recipient email: ${maskEmail(to)}`);
   
   const options = {
     method: 'POST',
@@ -65,7 +87,17 @@ const sendViaBrevo = async (to, subject, htmlContent) => {
     htmlContent: htmlContent
   };
 
-  await makeHttpRequest('https://api.brevo.com/v3/smtp/email', options, postData);
+  const response = await makeHttpRequest('https://api.brevo.com/v3/smtp/email', options, postData);
+  
+  try {
+    const resBody = JSON.parse(response.body);
+    if (resBody.messageId) {
+      console.log(`[Email Service] Brevo messageId: ${resBody.messageId}`);
+    }
+    console.log('[Email Service] Brevo API full response:', JSON.stringify(resBody));
+  } catch (parseErr) {
+    console.log('[Email Service] Brevo API raw response body:', response.body);
+  }
 };
 
 const sendViaResend = async (to, subject, htmlContent) => {
