@@ -1,6 +1,8 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
@@ -23,9 +25,6 @@ import User from './models/User.js';
 
 import { protect, admin } from './middlewares/authMiddleware.js';
 import { verifyPythonDependencies } from './services/backgroundRemovalService.js';
-
-// Load env vars
-dotenv.config();
 
 // Connect to database
 await connectDB();

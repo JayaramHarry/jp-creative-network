@@ -1,5 +1,6 @@
 import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
+import { sendVerificationEmail, sendForgotPasswordEmail } from '../services/emailService.js';
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'memoria_studio_super_secret_jwt_token_key_12345', {
@@ -34,7 +35,17 @@ export const registerUser = async (req, res) => {
     });
 
     if (user) {
-      console.log(`[EMAIL VERIFICATION] OTP for ${user.email} is: ${verificationCode}`);
+      if (process.env.NODE_ENV === 'development' || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.log(`[EMAIL VERIFICATION] OTP for ${user.email} is: ${verificationCode}`);
+      }
+      
+      // Attempt to send email verification OTP in the background
+      sendVerificationEmail({
+        email: user.email,
+        name: user.name,
+        code: verificationCode
+      }).catch(err => console.error('[Email OTP send error]:', err));
+
       res.status(201).json({
         success: true,
         message: 'Registration successful! Verification code sent to email.',
@@ -63,7 +74,16 @@ export const loginUser = async (req, res) => {
         user.emailVerificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
         await user.save();
 
-        console.log(`[EMAIL VERIFICATION] OTP for unverified login ${user.email} is: ${verificationCode}`);
+        if (process.env.NODE_ENV === 'development' || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+          console.log(`[EMAIL VERIFICATION] OTP for unverified login ${user.email} is: ${verificationCode}`);
+        }
+
+        // Send verification email in the background
+        sendVerificationEmail({
+          email: user.email,
+          name: user.name,
+          code: verificationCode
+        }).catch(err => console.error('[Email OTP send error]:', err));
 
         return res.status(403).json({
           success: false,
@@ -124,7 +144,16 @@ export const forgotPassword = async (req, res) => {
     user.passwordResetCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
     await user.save();
 
-    console.log(`[PASSWORD RESET] OTP for ${user.email} is: ${resetCode}`);
+    if (process.env.NODE_ENV === 'development' || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.log(`[PASSWORD RESET] OTP for ${user.email} is: ${resetCode}`);
+    }
+
+    // Send forgot password email in the background
+    sendForgotPasswordEmail({
+      email: user.email,
+      name: user.name,
+      code: resetCode
+    }).catch(err => console.error('[Email Reset OTP send error]:', err));
 
     res.json({
       success: true,
@@ -192,7 +221,16 @@ export const resendVerification = async (req, res) => {
     user.emailVerificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
-    console.log(`[EMAIL VERIFICATION] Resent OTP for ${user.email} is: ${verificationCode}`);
+    if (process.env.NODE_ENV === 'development' || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.log(`[EMAIL VERIFICATION] Resent OTP for ${user.email} is: ${verificationCode}`);
+    }
+
+    // Send verification email in the background
+    sendVerificationEmail({
+      email: user.email,
+      name: user.name,
+      code: verificationCode
+    }).catch(err => console.error('[Email Resend OTP send error]:', err));
 
     res.json({
       success: true,
