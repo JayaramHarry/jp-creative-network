@@ -1,6 +1,6 @@
 import Template from '../models/Template.js';
 import Category from '../models/Category.js';
-import { uploadFileToStorage } from '../services/s3Service.js';
+import { uploadFileToStorage, deleteFileFromStorage } from '../services/s3Service.js';
 import { processCustomVideo } from '../services/videoProcessor.js';
 import path from 'path';
 import fs from 'fs';
@@ -253,6 +253,14 @@ export const deleteTemplate = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Template not found' });
     }
 
+    // Clean up associated media files from S3 or local uploads
+    if (template.previewUrl) {
+      await deleteFileFromStorage(template.previewUrl);
+    }
+    if (template.fileUrl) {
+      await deleteFileFromStorage(template.fileUrl);
+    }
+
     await template.deleteOne();
     res.json({ success: true, message: 'Template removed successfully' });
   } catch (error) {
@@ -405,7 +413,7 @@ export const processVideo = async (req, res) => {
     const safeUser = userName ? userName.toLowerCase().replace(/[^a-z0-9\s\-_]/g, '').trim().replace(/\s+/g, '_') : '';
     const finalFilename = safeUser ? `${safeTitle}_${safeUser}.mp4` : `${safeTitle}.mp4`;
 
-    const host = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
+    const host = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
     const fileUrl = `${host}/uploads/${outputFilename}`;
 
     // Background file cleanup

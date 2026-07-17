@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import API from '../../services/api.js';
+import API, { resolveUploadUrl } from '../../services/api.js';
 import './AdminDashboard.css';
 
 export default function AdminDashboard() {
@@ -1143,7 +1143,7 @@ export default function AdminDashboard() {
                               border: '1px solid rgba(255,255,255,0.1)'
                             }}>
                               <img
-                                src={preset.url}
+                                src={resolveUploadUrl(preset.url)}
                                 alt={preset.name}
                                 style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                               />

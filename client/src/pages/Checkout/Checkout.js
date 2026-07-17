@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import API from '../../services/api.js';
+import API, { resolveUploadUrl } from '../../services/api.js';
 import { AuthContext } from '../../context/AuthContext.js';
 import './Checkout.css';
 
@@ -192,7 +192,7 @@ export default function Checkout() {
           <div className="order-summary-card glass-card">
             <h2>Order Summary</h2>
             <div className="summary-item-row">
-              <div className="template-preview-small" style={{ backgroundImage: `url(${order.template?.previewUrl})` }} />
+              <div className="template-preview-small" style={{ backgroundImage: `url(${resolveUploadUrl(order.template?.previewUrl)})` }} />
               <div className="summary-item-details">
                 <h3>{order.template?.title}</h3>
                 <span className="summary-item-cat">{order.template?.category?.name || 'Category'}</span>

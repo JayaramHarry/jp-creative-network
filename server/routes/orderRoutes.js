@@ -18,7 +18,7 @@ router.post('/upload-audio', protect, upload.single('audio'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, message: 'No audio file uploaded' });
   }
-  const host = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
+  const host = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
   const fileUrl = `${host}/uploads/${req.file.filename}`;
   res.json({ success: true, fileUrl });
 });

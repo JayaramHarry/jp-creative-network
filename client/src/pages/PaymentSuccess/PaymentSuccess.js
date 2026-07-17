@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import API from '../../services/api.js';
+import API, { resolveUploadUrl } from '../../services/api.js';
 import { AuthContext } from '../../context/AuthContext.js';
 import { translateToTelugu } from '../../services/translations.js';
 import { downloadCanvasAsJpeg, downloadBlob, makeSafeFilename } from '../../services/downloadHelper.js';
@@ -66,7 +66,7 @@ export default function PaymentSuccess() {
 
     const bgImg = new Image();
     bgImg.crossOrigin = 'anonymous';
-    bgImg.src = order.template.previewUrl;
+    bgImg.src = resolveUploadUrl(order.template.previewUrl);
 
     const savedData = order.customizedData || {};
     const photoSettings = savedData.photoSettings || {};

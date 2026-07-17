@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import API from '../../services/api.js';
+import API, { resolveUploadUrl } from '../../services/api.js';
 import { AuthContext } from '../../context/AuthContext.js';
 import './TemplatesListing.css';
 
@@ -308,7 +308,7 @@ export default function TemplatesListing() {
             <div className="templates-grid">
               {templates.map((template) => (
                 <div key={template._id} className="template-card glass-card">
-                  <div className="template-image" style={{ backgroundImage: `url(${template.previewUrl})` }}>
+                  <div className="template-image" style={{ backgroundImage: `url(${resolveUploadUrl(template.previewUrl)})` }}>
                     {template.isFeatured && <span className="template-badge badge-featured">Featured</span>}
                     {template.isPopular && <span className="template-badge badge-popular">Popular</span>}
                     <span className="template-type-badge">{template.type === 'image' ? (language === 'en' ? 'IMG' : 'చిత్రం') : (language === 'en' ? 'VIDEO' : 'వీడియో')}</span>

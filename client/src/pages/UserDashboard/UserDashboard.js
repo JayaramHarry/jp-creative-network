@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import API from '../../services/api.js';
+import API, { resolveUploadUrl } from '../../services/api.js';
 import { AuthContext } from '../../context/AuthContext.js';
 import { translateToTelugu } from '../../services/translations.js';
 import { downloadCanvasAsJpeg, downloadBlob, makeSafeFilename } from '../../services/downloadHelper.js';
@@ -54,7 +54,7 @@ export default function UserDashboard() {
       if (ord.template.type !== 'video' && ord.template.previewUrl) {
         const bgImg = new Image();
         bgImg.crossOrigin = 'anonymous';
-        bgImg.src = ord.template.previewUrl;
+        bgImg.src = resolveUploadUrl(ord.template.previewUrl);
         imageCacheRef.current[`bg_${ord._id}`] = bgImg;
       }
 
@@ -544,7 +544,7 @@ export default function UserDashboard() {
         // Fallback to async drawing if not fully loaded yet
         const fallBg = new Image();
         fallBg.crossOrigin = 'anonymous';
-        fallBg.src = order.template.previewUrl;
+        fallBg.src = resolveUploadUrl(order.template.previewUrl);
         fallBg.onload = () => {
           if (needsUserImg) {
             const fallUser = new Image();
@@ -656,7 +656,7 @@ export default function UserDashboard() {
                   {/* Order Preview Image */}
                   <div 
                     className="order-image-preview" 
-                    style={{ backgroundImage: `url(${ord.template?.previewUrl})` }}
+                    style={{ backgroundImage: `url(${resolveUploadUrl(ord.template?.previewUrl)})` }}
                   />
 
                   {/* Order Details */}

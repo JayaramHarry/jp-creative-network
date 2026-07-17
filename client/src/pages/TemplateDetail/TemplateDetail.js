@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import API from '../../services/api.js';
+import API, { resolveUploadUrl } from '../../services/api.js';
 import { AuthContext } from '../../context/AuthContext.js';
 import { downloadBlob } from '../../services/downloadHelper.js';
 import { translateToTelugu } from '../../services/translations.js';
@@ -228,14 +228,14 @@ export default function TemplateDetail() {
       if ((layer.type === 'image' || layer.type === 'symbol' || layer.type === 'background') && layer.url && !layer.imageObj) {
         const img = new Image();
         img.crossOrigin = 'anonymous';
-        img.src = layer.url;
+        img.src = resolveUploadUrl(layer.url);
         img.onload = () => {
           setLayers(prev => prev.map(l => l.id === layer.id ? { ...l, imageObj: img } : l));
         };
       } else if (layer.type === 'video' && layer.url && !layer.videoObj) {
         const video = document.createElement('video');
         video.crossOrigin = 'anonymous';
-        video.src = layer.url;
+        video.src = resolveUploadUrl(layer.url);
         video.muted = true;
         video.playsInline = true;
         video.onloadedmetadata = () => {
@@ -267,7 +267,8 @@ export default function TemplateDetail() {
               if (l.type === 'image' || l.type === 'symbol') {
                 return {
                   ...l,
-                  originalUrl: l.originalUrl || l.url,
+                  url: resolveUploadUrl(l.url),
+                  originalUrl: resolveUploadUrl(l.originalUrl || l.url),
                   cropBox: l.cropBox || { left: 0, right: 0, top: 0, bottom: 0 }
                 };
               }
@@ -284,7 +285,7 @@ export default function TemplateDetail() {
               id: 'background',
               type: 'background',
               name: 'Background Base',
-              url: tpl.fileUrl || tpl.previewUrl,
+              url: resolveUploadUrl(tpl.fileUrl || tpl.previewUrl),
               x: 0,
               y: 0,
               width: tpl.config?.canvasWidth || 1080,
@@ -3871,15 +3872,11 @@ export default function TemplateDetail() {
                 }}>
                   {(() => {
                     const mappedDynamic = dynamicPresets.map(dp => {
-                      let cleanUrl = dp.url;
-                      if (!cleanUrl.startsWith('http') && !cleanUrl.startsWith('/')) {
-                        cleanUrl = `/uploads/${cleanUrl}`;
-                      }
                       return {
                         id: dp._id,
                         category: dp.category,
                         name: dp.name,
-                        url: cleanUrl
+                        url: resolveUploadUrl(dp.url)
                       };
                     });
                     const allPresets = [...PRESET_ITEMS, ...mappedDynamic];
@@ -4138,7 +4135,7 @@ export default function TemplateDetail() {
         {template?.type === 'video' && (
           <video
             ref={videoRef}
-            src={template.fileUrl || template.previewUrl}
+            src={resolveUploadUrl(template.fileUrl || template.previewUrl)}
             crossOrigin="anonymous"
             loop={false}
             muted={audioOption !== 'keep'}

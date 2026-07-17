@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import API from '../../services/api.js';
+import API, { resolveUploadUrl } from '../../services/api.js';
 import { getWhatsAppLink } from '../../services/whatsappHelper.js';
 import './Home.css';
 
@@ -197,7 +197,7 @@ export default function Home() {
               {featuredTemplates.length > 0 ? (
                 featuredTemplates.map((template) => (
                   <div key={template._id} className="template-card glass-card">
-                    <div className="template-image" style={{ backgroundImage: `url(${template.previewUrl})` }}>
+                    <div className="template-image" style={{ backgroundImage: `url(${resolveUploadUrl(template.previewUrl)})` }}>
                       <span className="template-badge badge-featured">Featured</span>
                     </div>
                     <div className="template-details">
@@ -256,7 +256,7 @@ export default function Home() {
             {popularTemplates.length > 0 ? (
               popularTemplates.map((template) => (
                 <div key={template._id} className="template-card glass-card">
-                  <div className="template-image" style={{ backgroundImage: `url(${template.previewUrl})` }}>
+                  <div className="template-image" style={{ backgroundImage: `url(${resolveUploadUrl(template.previewUrl)})` }}>
                     <span className="template-badge badge-popular">Popular</span>
                   </div>
                   <div className="template-details">

@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import fs from 'fs';
 import path from 'path';
 
@@ -49,11 +49,50 @@ export const uploadFileToStorage = async (file) => {
       return `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${filename}`;
     } catch (error) {
       console.error('Error uploading file to AWS S3, using local fallback:', error);
-      const host = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
-      return `${host}/uploads/${file.filename}`;
+      return `/uploads/${file.filename}`;
     }
   } else {
-    const host = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
-    return `${host}/uploads/${file.filename}`;
+    return `/uploads/${file.filename}`;
+  }
+};
+
+export const deleteFileFromStorage = async (fileUrl) => {
+  if (!fileUrl) return;
+
+  if (isAWSConfigured() && fileUrl.includes('.amazonaws.com/')) {
+    try {
+      const urlParts = fileUrl.split('.amazonaws.com/');
+      if (urlParts.length > 1) {
+        const key = urlParts[1];
+        console.log(`[Storage] Attempting to delete S3 object: ${key}`);
+        await s3Client.send(
+          new DeleteObjectCommand({
+            Bucket: process.env.AWS_BUCKET_NAME,
+            Key: key,
+          })
+        );
+        console.log(`[Storage] Deleted S3 object successfully: ${key}`);
+      }
+    } catch (error) {
+      console.error('[Storage] Error deleting file from S3:', error);
+    }
+  } else {
+    try {
+      let filename = '';
+      if (fileUrl.includes('/uploads/')) {
+        filename = fileUrl.split('/uploads/')[1];
+      } else {
+        filename = path.basename(fileUrl);
+      }
+      
+      const filePath = path.join(process.cwd(), 'uploads', filename);
+      if (fs.existsSync(filePath)) {
+        console.log(`[Storage] Attempting to delete local file: ${filePath}`);
+        fs.unlinkSync(filePath);
+        console.log(`[Storage] Deleted local file successfully: ${filePath}`);
+      }
+    } catch (error) {
+      console.error('[Storage] Error deleting local file:', error);
+    }
   }
 };
