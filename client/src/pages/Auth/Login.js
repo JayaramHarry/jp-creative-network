@@ -1,13 +1,17 @@
 import React, { useState, useContext } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext.js';
 import './Auth.css';
 
 export default function Login() {
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState(
+    location.state?.registrationSuccess ? 'Account created successfully. Please log in.' : ''
+  );
   const [loadingLocal, setLoadingLocal] = useState(false);
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -15,6 +19,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+    setSuccessMsg('');
 
     if (!email || !password) {
       setErrorMsg('Please enter both email and password.');
@@ -49,6 +54,7 @@ export default function Login() {
         <h2 className="auth-title">Welcome Back to <span>Memoria Studio</span></h2>
         <p className="auth-subtitle">Log in to customize and access your templates</p>
 
+        {successMsg && <div className="auth-alert alert-success">{successMsg}</div>}
         {errorMsg && <div className="auth-alert alert-danger">{errorMsg}</div>}
 
         <form onSubmit={handleSubmit} className="auth-form">
@@ -67,9 +73,12 @@ export default function Login() {
           <div className="form-group">
             <div className="form-label-row">
               <label className="form-label">Password</label>
+              {/* Temporarily disabled/hidden until email delivery is finalized */}
+              {/* 
               <Link to="/forgot-password" style={{ fontSize: '0.85rem', color: 'var(--primary-hover)' }}>
                 Forgot Password?
               </Link>
+              */}
             </div>
             <input
               type={showPassword ? 'text' : 'password'}

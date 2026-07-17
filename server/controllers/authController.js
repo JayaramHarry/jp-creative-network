@@ -31,26 +31,14 @@ export const registerUser = async (req, res) => {
       role,
       emailVerificationCode: verificationCode,
       emailVerificationCodeExpires: verificationCodeExpires,
-      isEmailVerified: false,
+      isEmailVerified: true,
     });
 
     if (user) {
-      if (process.env.NODE_ENV === 'development' || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        console.log(`[EMAIL VERIFICATION] OTP for ${user.email} is: ${verificationCode}`);
-      }
-      
-      // Attempt to send email verification OTP in the background
-      sendVerificationEmail({
-        email: user.email,
-        name: user.name,
-        code: verificationCode
-      }).catch(err => console.error('[Email OTP send error]:', err));
-
       res.status(201).json({
         success: true,
-        message: 'Registration successful! Verification code sent to email.',
+        message: 'Registration successful!',
         email: user.email,
-        ...(process.env.NODE_ENV === 'development' ? { testCode: verificationCode } : {}),
       });
     } else {
       res.status(400).json({ success: false, message: 'Invalid user data' });
@@ -69,29 +57,8 @@ export const loginUser = async (req, res) => {
 
     if (user && (await user.matchPassword(password))) {
       if (!user.isEmailVerified) {
-        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-        user.emailVerificationCode = verificationCode;
-        user.emailVerificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
+        user.isEmailVerified = true;
         await user.save();
-
-        if (process.env.NODE_ENV === 'development' || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-          console.log(`[EMAIL VERIFICATION] OTP for unverified login ${user.email} is: ${verificationCode}`);
-        }
-
-        // Send verification email in the background
-        sendVerificationEmail({
-          email: user.email,
-          name: user.name,
-          code: verificationCode
-        }).catch(err => console.error('[Email OTP send error]:', err));
-
-        return res.status(403).json({
-          success: false,
-          message: 'Your email address is not verified. Please verify your email first.',
-          email: user.email,
-          isEmailVerified: false,
-          ...(process.env.NODE_ENV === 'development' ? { testCode: verificationCode } : {}),
-        });
       }
 
       res.json({

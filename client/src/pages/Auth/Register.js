@@ -37,12 +37,7 @@ export default function Register() {
       setLoadingLocal(true);
       const res = await register(name, email, password);
       if (res.success) {
-        const queryParams = new URLSearchParams();
-        queryParams.set('email', res.email);
-        if (res.testCode) {
-          queryParams.set('code', res.testCode);
-        }
-        navigate(`/verify-email?${queryParams.toString()}`);
+        navigate('/login', { state: { registrationSuccess: true } });
       } else {
         setErrorMsg(res.message || 'Registration failed.');
       }
