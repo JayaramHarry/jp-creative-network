@@ -9,6 +9,17 @@ const isRazorpayConfigured = () => {
   );
 };
 
+const maskRazorpayId = (keyId) => {
+  if (!keyId) return 'N/A';
+  if (keyId.length <= 8) return '****';
+  return `${keyId.substring(0, 8)}****${keyId.substring(keyId.length - 3)}`;
+};
+
+console.log('=== RAZORPAY DIAGNOSTIC LOGS ===');
+console.log(`RAZORPAY_KEY_ID exists: ${!!process.env.RAZORPAY_KEY_ID}`);
+console.log(`RAZORPAY_KEY_SECRET exists: ${!!process.env.RAZORPAY_KEY_SECRET}`);
+console.log(`Masked Key ID: ${maskRazorpayId(process.env.RAZORPAY_KEY_ID)}`);
+
 let razorpayInstance = null;
 if (isRazorpayConfigured()) {
   try {
@@ -16,13 +27,14 @@ if (isRazorpayConfigured()) {
       key_id: process.env.RAZORPAY_KEY_ID,
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
-    console.log('Razorpay Service Initialized');
+    console.log('[Diagnostic] Razorpay instance initialized successfully.');
   } catch (error) {
-    console.error('Error initializing Razorpay, switching to mock mode:', error);
+    console.error('[Diagnostic] Error initializing Razorpay:', error);
   }
 } else {
-  console.log('Razorpay credentials are empty or mock. Running in Mock Payment mode.');
+  console.log('[Diagnostic] Razorpay credentials missing or running in mock mode.');
 }
+console.log('=================================');
 
 export const createPaymentOrder = async (amount, receipt) => {
   const amountInPaise = Math.round(amount * 100);

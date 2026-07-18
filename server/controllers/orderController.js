@@ -20,7 +20,11 @@ export const getOrderById = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    res.json({ success: true, data: order });
+    res.json({ 
+      success: true, 
+      data: order,
+      razorpayKeyId: process.env.RAZORPAY_KEY_ID
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
