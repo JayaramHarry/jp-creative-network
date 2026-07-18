@@ -1,4 +1,5 @@
 import Template from '../models/Template.js';
+import Order from '../models/Order.js';
 import Category from '../models/Category.js';
 import { uploadFileToStorage, deleteFileFromStorage } from '../services/s3Service.js';
 import { processCustomVideo } from '../services/videoProcessor.js';
@@ -320,6 +321,23 @@ export const processVideo = async (req, res) => {
     if (templateId) {
       const template = await Template.findById(templateId);
       if (template) {
+        // Security check: ensure premium templates are paid for
+        const isFree = !template.price || template.price === 0;
+        const isBypassUser = req.user.role === 'admin' || req.user.name === 'harry' || req.user.email === 'harry@memoriastudio.com';
+        if (!isFree && !isBypassUser) {
+          const hasPaidOrder = await Order.findOne({
+            user: req.user._id,
+            template: templateId,
+            status: 'paid'
+          });
+          if (!hasPaidOrder) {
+            return res.status(403).json({
+              success: false,
+              message: 'Access denied. You must purchase this template before processing/stitching customized videos.'
+            });
+          }
+        }
+
         templateTitle = template.title;
         if (template.fileUrl) {
           let filename = '';

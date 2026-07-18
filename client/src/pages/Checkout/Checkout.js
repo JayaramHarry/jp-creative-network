@@ -29,9 +29,6 @@ export default function Checkout() {
         setLoading(true);
         setError(null);
         const { data } = await API.get(`/orders/${orderId}`);
-        
-        // Diagnostic log: Log the response from the order creation API before Checkout opens
-        console.log('[Diagnostic] Checkout Order Response:', data);
 
         if (data.success) {
           setOrder(data.data);
@@ -86,8 +83,6 @@ export default function Checkout() {
       // let's define a fallback or mock payment verification directly.
       
       const keyId = order.isMock ? '' : (razorpayKey || process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_mockKey');
-
-      console.log(`[Diagnostic] Initializing Razorpay Checkout with Key ID: ${keyId}`);
 
       const options = {
         key: keyId,

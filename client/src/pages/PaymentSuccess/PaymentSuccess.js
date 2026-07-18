@@ -31,7 +31,11 @@ export default function PaymentSuccess() {
         setLoading(true);
         const { data } = await API.get(`/orders/${orderId}`);
         if (data.success) {
-          setOrder(data.data);
+          if (data.data.status !== 'paid') {
+            setError('Payment verification is pending or failed. Download access is locked.');
+          } else {
+            setOrder(data.data);
+          }
         }
       } catch (err) {
         console.error('Error fetching order receipt:', err);

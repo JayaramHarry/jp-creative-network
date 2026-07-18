@@ -109,7 +109,7 @@ export const verifyPayment = async (req, res) => {
     const isAuthentic = verifyPaymentSignature(orderId, paymentId, signature);
 
     if (!isAuthentic) {
-      return res.status(400).json({ success: false, message: 'Payment verification failed' });
+      return res.status(403).json({ success: false, message: 'Payment verification failed' });
     }
 
     const order = await Order.findOne({ orderId });
